@@ -1,7 +1,7 @@
 # WorkAlly 需求基线总册
 
 > 状态：**已冻结**（需求讨论定稿）  
-> 范围：产品定位、组织权限、信息架构（A）、领域对象与 API 草图（B）、Agent 内核原则  
+> 范围：产品定位、组织权限、信息架构（A）、领域对象与 API 草图（B）、Agent 内核原则、技术选型（T）  
 > 用途：研发排期与设计的唯一需求依据；变更需显式修订本册
 
 ---
@@ -305,8 +305,65 @@ Expert 绑定校验：配置可写同租户资源；**运行时实际注入** = 
 
 ---
 
-## 11. 修订记录
+## 11. 技术选型（T）
+
+### 11.1 总表
+
+| 层 | 选型 |
+|---|---|
+| 架构 | 同仓模块化单体（逻辑分模块，部署可先单进程 + worker） |
+| 前端 | Next.js（App Router）+ React + TypeScript + Tailwind + shadcn/ui |
+| 数据请求 / 流式 | TanStack Query；Run 事件用 SSE |
+| 后端 | NestJS + TypeScript + Prisma |
+| Agent Runtime | Mastra（执行内核）+ SSE 事件映射；前端可用 AI SDK 辅助消费流 |
+| 主库 | **MySQL 8** |
+| 缓存 / 队列 | **Redis + BullMQ** |
+| 对象存储 | **MinIO**（S3 API） |
+| 鉴权 | 自建邮箱登录 + JWT（SSO 后期） |
+| 包管理 | pnpm workspace |
+| 本地环境 | Docker Compose：api + web + mysql + redis + minio |
+
+### 11.2 仓结构
+
+```text
+work-ally/
+├─ apps/
+│  ├─ web/                 # Next.js：工作台 + 管理后台
+│  └─ api/                 # NestJS：业务模块 + runtime 模块
+├─ packages/
+│  ├─ shared/              # Zod schema / 类型 / 常量
+│  └─ tsconfig/
+├─ docker/
+│  └─ docker-compose.yml
+└─ docs/
+   └─ requirements-baseline.md
+```
+
+### 11.3 Nest 模块边界
+
+`auth` / `tenants` / `groups` / `members` / `connectors` / `skills` / `experts` / `knowledge` / `models` / `default-agent` / `sessions` / `attachments` / `runtime` / `acl`
+
+### 11.4 集成边界
+
+| 集成 | 方式 |
+|---|---|
+| MCP | Runtime 内 MCP Client；仅 SSE / Streamable HTTP；凭据解密注入，日志脱敏 |
+| Dify / RAGFlow | Knowledge Adapter：`retrieve` → `citations[]`；对 Agent 暴露统一 `knowledge_retrieve` tool |
+| 模型 | `ModelConfig` → `@ai-sdk` provider；支持 Auto 候选 |
+| 附件 | 上传至 MinIO；Run 可读文件上下文（MVP 先支持常见文本/办公格式子集） |
+| Mastra 与 MySQL | 业务与 Run 状态以 MySQL（本系统表）为准；Mastra 作执行引擎，MVP 不强依赖其外置 PG memory |
+
+### 11.5 部署原则
+
+- 逻辑多租户（`tenant_id` 行级隔离）  
+- API 与 Runtime 同仓；BullMQ worker 可同进程或第二容器  
+- 不做：多活、自建向量库、Kafka、桌面端  
+
+---
+
+## 12. 修订记录
 
 | 日期 | 说明 |
 |---|---|
 | 2026-08-21 | 初版冻结：需求讨论 A+B + 权限 + Agent 内核 + 首页交互定稿汇总 |
+| 2026-08-21 | 增补技术选型 T1–T6：同仓单体、Next/Nest、Mastra、MySQL、Redis/BullMQ、MinIO |
