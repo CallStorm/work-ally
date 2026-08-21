@@ -368,3 +368,4 @@ work-ally/
 | 2026-08-21 | 初版冻结：需求讨论 A+B + 权限 + Agent 内核 + 首页交互定稿汇总 |
 | 2026-08-21 | 增补技术选型 T1–T6：同仓单体、Next/Nest、Mastra、MySQL、Redis/BullMQ、MinIO |
 | 2026-08-21 | 落地 monorepo 脚手架：apps/web、apps/api、packages/*、docker Compose、Prisma 模型 |
+| 2026-08-21 | Runtime 最小可跑通：JWT 注册登录、Sessions→AgentRun、Mastra/mock runner、SSE 事件、smoke 脚本 |

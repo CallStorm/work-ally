@@ -36,4 +36,4 @@ pnpm dev
 
 ## 状态
 
-需求与技术选型已定稿；脚手架已落地；业务 API / Agent Runtime 待实现。
+需求与技术选型已定稿；脚手架已落地；**Runtime 最小路径已可跑通**（mock 默认，可切 Mastra）。

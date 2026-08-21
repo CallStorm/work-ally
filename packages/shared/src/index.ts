@@ -61,7 +61,13 @@ export const CreateSessionSchema = z.object({
   modelId: z.string().min(1).default('auto'),
   content: z.string().min(1),
   attachmentIds: z.array(z.string()).default([]),
-  context: SessionContextSchema.default({}),
+  context: SessionContextSchema.default({
+    skillIds: [],
+    connectorIds: [],
+    knowledgeEnabled: false,
+    knowledgeIds: [],
+    attachmentIds: [],
+  }),
 });
 export type CreateSessionInput = z.infer<typeof CreateSessionSchema>;
 
