@@ -1,7 +1,11 @@
 # work-ally
 
-An AI-powered workspace ally integrating Knowledge Hub, Skill Matrix, and Domain Experts.
+面向企业全员办公的云端 SaaS Agent 平台：连接器（MCP）、技能、专家、第三方知识库，提升团队日常办公效率。
 
-## Overview
+## 文档
 
-work-ally is a starter repository. Add project documentation here.
+- **[需求基线总册](docs/requirements-baseline.md)** — 已冻结的产品需求、信息架构、领域对象与 API 草图（研发依据）
+
+## 状态
+
+需求基线已定稿；实现尚未开始。
