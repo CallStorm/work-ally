@@ -12,7 +12,8 @@
     "db:migrate": "pnpm --filter @work-ally/api prisma:migrate",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
-    "smoke:runtime": "bash scripts/smoke-runtime.sh"
+    "smoke:runtime": "bash scripts/smoke-runtime.sh",
+    "smoke:acl": "bash scripts/smoke-acl-assets.sh"
   },
   "engines": {
     "node": ">=20"
