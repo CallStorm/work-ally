@@ -1,0 +1,19 @@
+{
+  "name": "work-ally",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter @work-ally/api --filter @work-ally/web dev",
+    "dev:api": "pnpm --filter @work-ally/api dev",
+    "dev:web": "pnpm --filter @work-ally/web dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @work-ally/api prisma:generate",
+    "db:migrate": "pnpm --filter @work-ally/api prisma:migrate",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

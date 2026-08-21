@@ -1,0 +1,429 @@
+// Prisma schema aligned with docs/requirements-baseline.md (B domain model)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  owner
+  admin
+  member
+}
+
+enum MembershipStatus {
+  active
+  invited
+  disabled
+}
+
+enum Visibility {
+  private
+  restricted
+  tenant
+}
+
+enum PrincipalType {
+  group
+  user
+}
+
+enum ResourceType {
+  connector
+  skill
+  expert
+  knowledge
+}
+
+enum McpTransport {
+  sse
+  streamable_http
+}
+
+enum KnowledgeProvider {
+  dify
+  ragflow
+}
+
+enum AgentMode {
+  expert
+  default
+}
+
+enum AgentRunState {
+  queued
+  running
+  succeeded
+  failed
+  cancelled
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+}
+
+enum HealthStatus {
+  unknown
+  ok
+  error
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  memberships      Membership[]
+  groups           Group[]
+  connectors       Connector[]
+  skills           Skill[]
+  experts          Expert[]
+  knowledgeBindings KnowledgeBinding[]
+  defaultAgent     DefaultAgent?
+  modelConfigs     ModelConfig[]
+  sessions         Session[]
+  attachments      Attachment[]
+  aclEntries       AclEntry[]
+
+  @@map("tenants")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  memberships   Membership[]
+  groupMembers  GroupMember[]
+  ownedConnectors Connector[] @relation("ConnectorOwner")
+  ownedSkills     Skill[]     @relation("SkillOwner")
+  ownedExperts    Expert[]    @relation("ExpertOwner")
+  ownedKnowledge  KnowledgeBinding[] @relation("KnowledgeOwner")
+  sessions        Session[]
+  attachments     Attachment[]
+
+  @@map("users")
+}
+
+model Membership {
+  id        String           @id @default(cuid())
+  tenantId  String           @map("tenant_id")
+  userId    String           @map("user_id")
+  role      MembershipRole
+  status    MembershipStatus @default(active)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@map("memberships")
+}
+
+model Group {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  name        String
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  members GroupMember[]
+  sessions Session[]
+
+  @@unique([tenantId, name])
+  @@map("groups")
+}
+
+model GroupMember {
+  id        String   @id @default(cuid())
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  joinedAt  DateTime @default(now()) @map("joined_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model AclEntry {
+  id            String        @id @default(cuid())
+  tenantId      String        @map("tenant_id")
+  resourceType  ResourceType  @map("resource_type")
+  resourceId    String        @map("resource_id")
+  principalType PrincipalType @map("principal_type")
+  principalId   String        @map("principal_id")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([resourceType, resourceId])
+  @@index([tenantId, principalType, principalId])
+  @@map("acl_entries")
+}
+
+model Connector {
+  id             String       @id @default(cuid())
+  tenantId       String       @map("tenant_id")
+  name           String
+  description    String?      @db.Text
+  ownerUserId    String       @map("owner_user_id")
+  visibility     Visibility   @default(private)
+  status         String       @default("active")
+  transport      McpTransport
+  endpointUrl    String       @map("endpoint_url")
+  authType       String       @default("none") @map("auth_type")
+  credentialsEnc String?      @db.Text @map("credentials_enc")
+  healthStatus   HealthStatus @default(unknown) @map("health_status")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner  User   @relation("ConnectorOwner", fields: [ownerUserId], references: [id])
+
+  @@index([tenantId])
+  @@map("connectors")
+}
+
+model Skill {
+  id               String     @id @default(cuid())
+  tenantId         String     @map("tenant_id")
+  name             String
+  slug             String
+  description      String?    @db.Text
+  descriptionShort String     @map("description_short") @db.VarChar(512)
+  bodyMd           String     @map("body_md") @db.LongText
+  version          Int        @default(1)
+  ownerUserId      String     @map("owner_user_id")
+  visibility       Visibility @default(private)
+  status           String     @default("active")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner  User   @relation("SkillOwner", fields: [ownerUserId], references: [id])
+
+  @@unique([tenantId, slug])
+  @@index([tenantId])
+  @@map("skills")
+}
+
+model KnowledgeBinding {
+  id                 String            @id @default(cuid())
+  tenantId           String            @map("tenant_id")
+  name               String
+  displayName        String            @map("display_name")
+  description        String?           @db.Text
+  ownerUserId        String            @map("owner_user_id")
+  visibility         Visibility        @default(private)
+  status             String            @default("active")
+  provider           KnowledgeProvider
+  baseUrl            String            @map("base_url")
+  credentialsEnc     String?           @db.Text @map("credentials_enc")
+  externalDatasetIds Json              @default("[]") @map("external_dataset_ids")
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner  User   @relation("KnowledgeOwner", fields: [ownerUserId], references: [id])
+
+  @@index([tenantId])
+  @@map("knowledge_bindings")
+}
+
+model Expert {
+  id                String     @id @default(cuid())
+  tenantId          String     @map("tenant_id")
+  name              String
+  description       String?    @db.Text
+  avatarUrl         String?    @map("avatar_url")
+  personaMd         String     @map("persona_md") @db.LongText
+  suggestedPrompts  Json       @default("[]") @map("suggested_prompts")
+  skillIds          Json       @default("[]") @map("skill_ids")
+  connectorIds      Json       @default("[]") @map("connector_ids")
+  knowledgeIds      Json       @default("[]") @map("knowledge_ids")
+  modelPolicy       Json?      @map("model_policy")
+  ownerUserId       String     @map("owner_user_id")
+  visibility        Visibility @default(private)
+  status            String     @default("active")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  owner    User      @relation("ExpertOwner", fields: [ownerUserId], references: [id])
+  sessions Session[]
+  usages   ExpertUsage[]
+
+  @@index([tenantId])
+  @@map("experts")
+}
+
+model ExpertUsage {
+  id        String   @id @default(cuid())
+  expertId  String   @map("expert_id")
+  userId    String   @map("user_id")
+  usedAt    DateTime @default(now()) @map("used_at")
+
+  expert Expert @relation(fields: [expertId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt])
+  @@index([expertId, userId])
+  @@map("expert_usages")
+}
+
+model DefaultAgent {
+  id               String   @id @default(cuid())
+  tenantId         String   @unique @map("tenant_id")
+  personaMd        String?  @map("persona_md") @db.LongText
+  suggestedPrompts Json     @default("[]") @map("suggested_prompts")
+  skillIds         Json     @default("[]") @map("skill_ids")
+  connectorIds     Json     @default("[]") @map("connector_ids")
+  knowledgeIds     Json     @default("[]") @map("knowledge_ids")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("default_agents")
+}
+
+model ModelConfig {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  modelId          String   @map("model_id")
+  displayName      String   @map("display_name")
+  isAutoCandidate  Boolean  @default(true) @map("is_auto_candidate")
+  enabled          Boolean  @default(true)
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, modelId])
+  @@index([tenantId, enabled])
+  @@map("model_configs")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  groupId   String   @map("group_id")
+  createdBy String   @map("created_by")
+  title     String?
+  expertId  String?  @map("expert_id")
+  modelId   String   @map("model_id")
+  status    String   @default("active")
+  context   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group    Group     @relation(fields: [groupId], references: [id])
+  creator  User      @relation(fields: [createdBy], references: [id])
+  expert   Expert?   @relation(fields: [expertId], references: [id])
+  messages Message[]
+  runs     AgentRun[]
+
+  @@index([tenantId, groupId, createdBy])
+  @@map("sessions")
+}
+
+model Message {
+  id            String      @id @default(cuid())
+  sessionId     String      @map("session_id")
+  role          MessageRole
+  content       String      @db.LongText
+  attachmentIds Json        @default("[]") @map("attachment_ids")
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  session Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  runs    AgentRun[]
+
+  @@index([sessionId, createdAt])
+  @@map("messages")
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  uploaderId String   @map("uploader_id")
+  filename   String
+  mime       String
+  size       Int
+  storageKey String   @map("storage_key")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploader User   @relation(fields: [uploaderId], references: [id])
+
+  @@index([tenantId])
+  @@map("attachments")
+}
+
+model AgentRun {
+  id          String        @id @default(cuid())
+  sessionId   String        @map("session_id")
+  messageId   String        @map("message_id")
+  agentMode   AgentMode     @map("agent_mode")
+  expertId    String?       @map("expert_id")
+  state       AgentRunState @default(queued)
+  stepsCount  Int           @default(0) @map("steps_count")
+  errorSummary String?      @map("error_summary") @db.Text
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  session       Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message       Message         @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  toolCalls     ToolCall[]
+  knowledgeHits KnowledgeHit[]
+
+  @@index([sessionId, createdAt])
+  @@map("agent_runs")
+}
+
+model ToolCall {
+  id            String   @id @default(cuid())
+  runId         String   @map("run_id")
+  connectorId   String?  @map("connector_id")
+  toolName      String   @map("tool_name")
+  inputSummary  String?  @map("input_summary") @db.Text
+  outputSummary String?  @map("output_summary") @db.Text
+  status        String   @default("ok")
+  latencyMs     Int?     @map("latency_ms")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("tool_calls")
+}
+
+model KnowledgeHit {
+  id          String   @id @default(cuid())
+  runId       String   @map("run_id")
+  knowledgeId String   @map("knowledge_id")
+  query       String   @db.Text
+  citations   Json     @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@map("knowledge_hits")
+}
