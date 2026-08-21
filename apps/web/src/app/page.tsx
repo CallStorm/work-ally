@@ -41,11 +41,11 @@ export default function HomePage() {
           团队办公 Agent 工作台
         </h1>
         <p style={{ margin: '0 0 28px', color: 'var(--muted)', fontSize: 16 }}>
-          脚手架已就绪：工作台与管理后台入口如下。业务能力按需求基线迭代。
+          先登录/注册，再从工作台发送消息进入流式对话。
         </p>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Link
-            href="/workbench"
+            href="/login"
             style={{
               background: 'var(--accent)',
               color: '#fff',
@@ -54,10 +54,10 @@ export default function HomePage() {
               fontWeight: 600,
             }}
           >
-            进入工作台
+            登录 / 注册
           </Link>
           <Link
-            href="/admin"
+            href="/workbench"
             style={{
               background: 'var(--accent-soft)',
               color: 'var(--accent)',
@@ -66,7 +66,7 @@ export default function HomePage() {
               fontWeight: 600,
             }}
           >
-            管理后台
+            进入工作台
           </Link>
         </div>
       </div>

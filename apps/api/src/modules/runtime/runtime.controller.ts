@@ -28,16 +28,44 @@ export class RuntimeController {
   @Sse('runs/:id/events')
   eventsStream(@Param('id') id: string): Observable<MessageEvent> {
     return new Observable<MessageEvent>((subscriber) => {
-      const off = this.events.onRun(id, (event: RuntimeEvent) => {
+      let closed = false;
+      const push = (event: RuntimeEvent) => {
+        if (closed) return;
         subscriber.next({ data: event });
-        if (event.type === 'run_finished' || event.type === 'error') {
-          // keep streaming until finished; error also ends
-          if (event.type === 'run_finished') {
-            subscriber.complete();
+        if (event.type === 'run_finished') {
+          closed = true;
+          subscriber.complete();
+        }
+      };
+
+      const off = this.events.onRun(id, push);
+
+      // If the run already finished and buffer was cleared (e.g. process restart),
+      // close the stream after a DB check so clients don't hang.
+      void this.runtime.getRun(id).then((run) => {
+        if (closed) return;
+        if (
+          run.state === 'succeeded' ||
+          run.state === 'failed' ||
+          run.state === 'cancelled'
+        ) {
+          const buffered = this.events.getBuffered(id);
+          if (!buffered.some((e) => e.type === 'run_finished')) {
+            push({
+              type: 'run_finished',
+              runId: id,
+              sessionId: run.sessionId,
+              ts: new Date().toISOString(),
+              data: { state: run.state, replay: true },
+            });
           }
         }
       });
-      return () => off();
+
+      return () => {
+        closed = true;
+        off();
+      };
     });
   }
 }

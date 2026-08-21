@@ -46,8 +46,15 @@ pnpm smoke:runtime
 - `POST /api/auth/register`
 - `POST /api/sessions`（`wait:true` 同步等 Run 完成）
 - `GET /api/runs/:id`
-- `GET /api/runs/:id/events`（SSE）
+- `GET /api/runs/:id/events`（SSE；支持 Bearer 或 `?access_token=`）
 - `GET /api/sessions/:id`
+
+## 前端对话流
+
+1. 启动 API + Web：`pnpm --filter @work-ally/api start` 与 `pnpm --filter @work-ally/web start`（或 `pnpm dev`）
+2. 打开 http://localhost:3000/login 注册
+3. 工作台输入消息发送 → 进入 `/workbench/sessions/:id` 看流式输出与右侧事件
+4. 可继续追问（会触发新的 AgentRun + SSE）
 
 ## Workspace layout
 
