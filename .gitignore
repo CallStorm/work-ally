@@ -9,3 +9,5 @@ coverage
 .env.*.local
 *.log
 .pnpm-store
+.data
+tsconfig.tsbuildinfo

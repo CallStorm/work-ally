@@ -20,7 +20,10 @@ import { RuntimeModule } from './modules/runtime/runtime.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', 'apps/api/.env'],
+    }),
     EventEmitterModule.forRoot(),
     PrismaModule,
     AuthModule,

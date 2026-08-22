@@ -15,6 +15,10 @@ import { AdminGuard } from '../../common/admin.guard';
 import { CurrentUser, type AuthUser } from '../../common/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AclService } from '../acl/acl.service';
+import {
+  ExpertsService,
+  type ExpertAssistInput,
+} from './experts.service';
 
 @Controller('experts')
 @UseGuards(JwtAuthGuard)
@@ -22,15 +26,21 @@ export class ExpertsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly acl: AclService,
+    private readonly experts: ExpertsService,
   ) {}
 
   @Get()
   async list(
     @CurrentUser() user: AuthUser,
     @Query('sort') sort?: string,
+    @Query('all') all?: string,
   ) {
+    const isAdmin = user.role === 'owner' || user.role === 'admin';
     const items = await this.prisma.expert.findMany({
-      where: { tenantId: user.tenantId, status: 'active' },
+      where: {
+        tenantId: user.tenantId,
+        ...(all === '1' && isAdmin ? {} : { status: 'active' }),
+      },
       orderBy: { updatedAt: 'desc' },
     });
     let usable = await this.acl.filterUsable(user, 'experts', items);
@@ -57,6 +67,12 @@ export class ExpertsController {
       throw new NotFoundException();
     }
     return item;
+  }
+
+  @Post('assist')
+  @UseGuards(AdminGuard)
+  assist(@CurrentUser() user: AuthUser, @Body() body: ExpertAssistInput) {
+    return this.experts.assist(user.tenantId, body);
   }
 
   @Post()
@@ -135,15 +151,7 @@ export class ExpertsController {
 
   @Delete(':id')
   @UseGuards(AdminGuard)
-  async remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    const existing = await this.prisma.expert.findFirst({
-      where: { id, tenantId: user.tenantId },
-    });
-    if (!existing) throw new NotFoundException();
-    await this.prisma.expert.update({
-      where: { id },
-      data: { status: 'disabled' },
-    });
-    return { ok: true };
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.experts.remove(user.tenantId, id);
   }
 }

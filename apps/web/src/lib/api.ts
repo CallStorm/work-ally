@@ -15,10 +15,11 @@ export type StoredAuth = {
 };
 
 export function getApiBase() {
-  return (
-    process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ||
-    'http://localhost:3001/api'
-  );
+  // Prefer same-origin `/api` (Next rewrite → Nest) so LAN/Network URL works.
+  const fromEnv = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '');
+  if (fromEnv) return fromEnv;
+  if (typeof window !== 'undefined') return '/api';
+  return 'http://127.0.0.1:3001/api';
 }
 
 export function loadAuth(): StoredAuth | null {
@@ -61,16 +62,26 @@ export async function apiFetch<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(init.headers);
-  if (!headers.has('content-type') && init.body) {
+  const isFormData =
+    typeof FormData !== 'undefined' && init.body instanceof FormData;
+  if (!headers.has('content-type') && init.body && !isFormData) {
     headers.set('content-type', 'application/json');
   }
   const token = getToken();
   if (token) headers.set('authorization', `Bearer ${token}`);
 
-  const res = await fetch(`${getApiBase()}${path}`, {
-    ...init,
-    headers,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${getApiBase()}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch {
+    throw new ApiError(
+      '无法连接 API（Failed to fetch）。请确认 pnpm dev 中 API 已启动，并刷新页面。',
+      0,
+    );
+  }
   if (!res.ok) {
     let message = res.statusText;
     try {

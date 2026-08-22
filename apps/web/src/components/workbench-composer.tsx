@@ -1,42 +1,106 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
-const expertPresets = [
-  '深度研究',
-  '文档处理',
-  '数据分析',
-  '可视化',
-  '产品助手',
-];
+type Expert = {
+  id: string;
+  name: string;
+  suggestedPrompts: string[];
+};
+
+type ModelOption = {
+  id: string;
+  modelId: string;
+  displayName: string;
+};
+
+type DefaultAgent = {
+  suggestedPrompts: string[];
+};
 
 export default function WorkbenchComposer() {
   const { auth, ready } = useAuth();
   const router = useRouter();
+  const search = useSearchParams();
+  const preselectExpertId = search.get('expertId');
+
+  const [experts, setExperts] = useState<Expert[]>([]);
+  const [models, setModels] = useState<ModelOption[]>([]);
+  const [defaultPrompts, setDefaultPrompts] = useState<string[]>([]);
   const [content, setContent] = useState('');
-  const [modelId, setModelId] = useState('auto');
-  const [selectedExpertName, setSelectedExpertName] = useState<string | null>(
+  const [modelConfigId, setModelConfigId] = useState('');
+  const [selectedExpertId, setSelectedExpertId] = useState<string | null>(
     null,
   );
   const [prompt, setPrompt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  const [loadingAssets, setLoadingAssets] = useState(true);
+
+  const selectedExpert = useMemo(
+    () => experts.find((e) => e.id === selectedExpertId) ?? null,
+    [experts, selectedExpertId],
+  );
+
+  const suggested = useMemo(() => {
+    if (selectedExpert) {
+      return selectedExpert.suggestedPrompts?.length
+        ? selectedExpert.suggestedPrompts
+        : [
+            `用「${selectedExpert.name}」视角帮我拆解这个问题`,
+            '输出一页可执行结论',
+            '列出风险与下一步',
+          ];
+    }
+    return defaultPrompts;
+  }, [selectedExpert, defaultPrompts]);
 
   useEffect(() => {
     if (ready && !auth) router.replace('/login');
   }, [ready, auth, router]);
 
-  const suggested = useMemo(() => {
-    if (!selectedExpertName) return [] as string[];
-    return [
-      `用「${selectedExpertName}」视角帮我拆解这个问题`,
-      `输出一页可执行结论`,
-      `列出风险与下一步`,
-    ];
-  }, [selectedExpertName]);
+  useEffect(() => {
+    if (!auth) return;
+    let cancelled = false;
+    (async () => {
+      setLoadingAssets(true);
+      try {
+        const [expertList, modelList, defaultAgent] = await Promise.all([
+          apiFetch<Expert[]>('/experts?sort=recent_used'),
+          apiFetch<ModelOption[]>('/models'),
+          apiFetch<DefaultAgent>('/default-agent').catch(() => null),
+        ]);
+        if (cancelled) return;
+        setExperts(expertList);
+        setModels(modelList);
+        setDefaultPrompts(defaultAgent?.suggestedPrompts ?? []);
+        if (modelList.length > 0) {
+          setModelConfigId(modelList[0].id);
+        } else {
+          setModelConfigId('');
+        }
+        if (
+          preselectExpertId &&
+          expertList.some((e) => e.id === preselectExpertId)
+        ) {
+          setSelectedExpertId(preselectExpertId);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : '加载专家/模型失败');
+        }
+      } finally {
+        if (!cancelled) setLoadingAssets(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [auth, preselectExpertId]);
 
   async function send() {
     if (!auth?.defaultGroupId) {
@@ -45,6 +109,10 @@ export default function WorkbenchComposer() {
     }
     const text = (prompt ? `${prompt}\n\n` : '') + content.trim();
     if (!text) return;
+    if (!modelConfigId) {
+      setError('请先在管理后台配置并启用模型');
+      return;
+    }
     setSending(true);
     setError(null);
     try {
@@ -55,7 +123,8 @@ export default function WorkbenchComposer() {
         method: 'POST',
         body: JSON.stringify({
           groupId: auth.defaultGroupId,
-          modelId,
+          expertId: selectedExpertId,
+          modelConfigId,
           content: text,
           wait: false,
         }),
@@ -112,31 +181,56 @@ export default function WorkbenchComposer() {
             overflowX: 'auto',
             paddingBottom: 12,
             marginBottom: 12,
+            alignItems: 'center',
           }}
         >
-          {expertPresets.map((name) => (
+          {loadingAssets && (
+            <span style={{ color: 'var(--muted)', fontSize: 13 }}>
+              加载专家…
+            </span>
+          )}
+          {!loadingAssets && experts.length === 0 && (
+            <span style={{ color: 'var(--muted)', fontSize: 13 }}>
+              暂无可用专家。
+              {(auth.user.role === 'owner' || auth.user.role === 'admin') && (
+                <>
+                  {' '}
+                  去{' '}
+                  <Link href="/admin/experts" style={{ color: 'var(--accent)' }}>
+                    管理后台创建
+                  </Link>
+                </>
+              )}
+            </span>
+          )}
+          {experts.map((expert) => (
             <button
-              key={name}
+              key={expert.id}
               type="button"
-              onClick={() =>
-                setSelectedExpertName((cur) => (cur === name ? null : name))
-              }
+              onClick={() => {
+                setSelectedExpertId((cur) =>
+                  cur === expert.id ? null : expert.id,
+                );
+                setPrompt(null);
+              }}
               style={{
                 whiteSpace: 'nowrap',
                 border: '1px solid var(--line)',
                 background:
-                  selectedExpertName === name ? 'var(--accent-soft)' : '#fff',
+                  selectedExpertId === expert.id
+                    ? 'var(--accent-soft)'
+                    : '#fff',
                 borderRadius: 999,
                 padding: '8px 14px',
                 cursor: 'pointer',
               }}
             >
-              {name}
+              {expert.name}
             </button>
           ))}
         </div>
 
-        {selectedExpertName && (
+        {suggested.length > 0 && (
           <div
             style={{
               display: 'flex',
@@ -149,7 +243,7 @@ export default function WorkbenchComposer() {
               <button
                 key={item}
                 type="button"
-                onClick={() => setPrompt(item)}
+                onClick={() => setPrompt((cur) => (cur === item ? null : item))}
                 style={{
                   border: '1px solid var(--line)',
                   background: prompt === item ? 'var(--accent-soft)' : '#fff',
@@ -220,7 +314,7 @@ export default function WorkbenchComposer() {
               >
                 +
               </button>
-              {selectedExpertName ? (
+              {selectedExpert && (
                 <span
                   style={{
                     display: 'inline-flex',
@@ -234,10 +328,13 @@ export default function WorkbenchComposer() {
                     fontWeight: 600,
                   }}
                 >
-                  {selectedExpertName}
+                  {selectedExpert.name}
                   <button
                     type="button"
-                    onClick={() => setSelectedExpertName(null)}
+                    onClick={() => {
+                      setSelectedExpertId(null);
+                      setPrompt(null);
+                    }}
                     style={{
                       border: 'none',
                       background: 'transparent',
@@ -248,16 +345,12 @@ export default function WorkbenchComposer() {
                     ×
                   </button>
                 </span>
-              ) : (
-                <span style={{ fontSize: 13, color: 'var(--muted)' }}>
-                  默认 Agent
-                </span>
               )}
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select
-                value={modelId}
-                onChange={(e) => setModelId(e.target.value)}
+                value={modelConfigId}
+                onChange={(e) => setModelConfigId(e.target.value)}
                 style={{
                   border: '1px solid var(--line)',
                   borderRadius: 999,
@@ -265,7 +358,14 @@ export default function WorkbenchComposer() {
                   background: '#fff',
                 }}
               >
-                <option value="auto">Auto</option>
+                {models.length === 0 && (
+                  <option value="">请先配置模型</option>
+                )}
+                {models.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.displayName}
+                  </option>
+                ))}
               </select>
               <button
                 type="button"

@@ -3,11 +3,11 @@ import Link from 'next/link';
 const nav = [
   { href: '/admin', label: '概览' },
   { href: '/admin/members', label: '成员与组' },
-  { href: '/admin/connectors', label: '连接器' },
+  { href: '/admin/connectors', label: 'MCP' },
   { href: '/admin/skills', label: '技能' },
   { href: '/admin/experts', label: '专家' },
   { href: '/admin/knowledge', label: '知识库' },
-  { href: '/admin/default-agent', label: '默认 Agent' },
+  { href: '/admin/default-agent', label: 'Agent' },
   { href: '/admin/models', label: '模型配置' },
 ];
 

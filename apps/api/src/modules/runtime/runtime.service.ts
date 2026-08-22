@@ -3,12 +3,12 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RuntimeEventsService } from './runtime-events.service';
-import {
-  MastraRunnerService,
-  type AgentBundle,
-} from './mastra-runner.service';
+import { MastraRunnerService } from './mastra-runner.service';
+import { PiRunnerService } from './pi-runner.service';
+import { CapabilityBundleService } from './capability-bundle.service';
 
 @Injectable()
 export class RuntimeService {
@@ -18,7 +18,19 @@ export class RuntimeService {
     private readonly prisma: PrismaService,
     private readonly events: RuntimeEventsService,
     private readonly runner: MastraRunnerService,
+    private readonly piRunner: PiRunnerService,
+    private readonly capabilities: CapabilityBundleService,
+    private readonly config: ConfigService,
   ) {}
+
+  resolveEngine(): 'pi' | 'mastra' | 'mock' {
+    const forced = this.config.get<string>('RUNTIME_PROVIDER');
+    if (forced === 'mock' || forced === 'mastra' || forced === 'pi') {
+      return forced;
+    }
+    // Prefer Pi; credentials usually come from tenant LlmProvider, not only env.
+    return 'pi';
+  }
 
   async executeRun(runId: string) {
     const run = await this.prisma.agentRun.findUnique({
@@ -43,10 +55,11 @@ export class RuntimeService {
     });
     this.events.emit('run_started', runId, run.sessionId, {
       agentMode: run.agentMode,
+      engine: this.resolveEngine(),
     });
 
     try {
-      const bundle = await this.resolveBundle(run.session);
+      const bundle = await this.capabilities.resolveForSession(run.session);
       const history = run.session.messages
         .filter((m) => m.id !== run.messageId)
         .map((m) => ({
@@ -54,13 +67,47 @@ export class RuntimeService {
           content: m.content,
         }));
 
-      const result = await this.runner.run({
-        runId,
-        sessionId: run.sessionId,
-        bundle,
-        userMessage: run.message.content,
-        history,
-      });
+      const engine = this.resolveEngine();
+      let result: {
+        text: string;
+        stepsCount: number;
+        provider: string;
+      };
+
+      if (engine === 'pi') {
+        try {
+          result = await this.piRunner.run({
+            runId,
+            sessionId: run.sessionId,
+            tenantId: run.session.tenantId,
+            bundle,
+            userMessage: run.message.content,
+            history,
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : 'Pi runtime error';
+          this.logger.error(`Pi failed, falling back to mastra/mock: ${message}`);
+          this.events.emit('thinking', runId, run.sessionId, {
+            message: `Pi 失败，回退 Mastra：${message}`,
+          });
+          result = await this.runner.run({
+            runId,
+            sessionId: run.sessionId,
+            bundle,
+            userMessage: run.message.content,
+            history,
+          });
+        }
+      } else {
+        result = await this.runner.run({
+          runId,
+          sessionId: run.sessionId,
+          bundle,
+          userMessage: run.message.content,
+          history,
+        });
+      }
 
       const assistant = await this.prisma.message.create({
         data: {
@@ -116,35 +163,5 @@ export class RuntimeService {
     });
     if (!run) throw new NotFoundException('Run not found');
     return run;
-  }
-
-  private async resolveBundle(session: {
-    tenantId: string;
-    expertId: string | null;
-    modelId: string;
-    expert: {
-      name: string;
-      personaMd: string;
-    } | null;
-  }): Promise<AgentBundle> {
-    if (session.expertId && session.expert) {
-      return {
-        mode: 'expert',
-        name: session.expert.name,
-        instructions: session.expert.personaMd,
-        modelId: session.modelId,
-      };
-    }
-    const defaultAgent = await this.prisma.defaultAgent.findUnique({
-      where: { tenantId: session.tenantId },
-    });
-    return {
-      mode: 'default',
-      name: '默认助手',
-      instructions:
-        defaultAgent?.personaMd ??
-        '你是 WorkAlly 默认办公助手，用中文给出清晰结论。',
-      modelId: session.modelId,
-    };
   }
 }

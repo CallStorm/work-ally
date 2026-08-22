@@ -7,104 +7,89 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
 import { AdminGuard } from '../../common/admin.guard';
 import { CurrentUser, type AuthUser } from '../../common/current-user.decorator';
+import { SkillsService } from './skills.service';
 import { PrismaService } from '../../prisma/prisma.service';
-import { AclService } from '../acl/acl.service';
 
 @Controller('skills')
 @UseGuards(JwtAuthGuard)
 export class SkillsController {
   constructor(
+    private readonly skills: SkillsService,
     private readonly prisma: PrismaService,
-    private readonly acl: AclService,
   ) {}
 
   @Get()
-  async list(@CurrentUser() user: AuthUser) {
-    const items = await this.prisma.skill.findMany({
-      where: { tenantId: user.tenantId, status: 'active' },
-      orderBy: { updatedAt: 'desc' },
-    });
-    return this.acl.filterUsable(user, 'skills', items);
+  list(@CurrentUser() user: AuthUser) {
+    return this.skills.list(user);
+  }
+
+  /** Must be registered before :id routes. */
+  @Post('upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
+  upload(
+    @CurrentUser() user: AuthUser,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: { visibility?: 'private' | 'restricted' | 'tenant' },
+  ) {
+    const isAdmin = user.role === 'owner' || user.role === 'admin';
+    const visibility =
+      body.visibility ?? (isAdmin ? 'tenant' : 'private');
+    return this.skills.uploadZip(user, file, visibility);
   }
 
   @Get(':id')
-  async get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    const item = await this.prisma.skill.findFirst({
-      where: { id, tenantId: user.tenantId },
-    });
-    if (!item || !(await this.acl.canUse(user, 'skills', item))) {
-      throw new NotFoundException();
-    }
-    return item;
-  }
-
-  @Post()
-  @UseGuards(AdminGuard)
-  create(
-    @CurrentUser() user: AuthUser,
-    @Body()
-    body: {
-      name: string;
-      slug: string;
-      description?: string;
-      descriptionShort: string;
-      bodyMd: string;
-      visibility?: 'private' | 'restricted' | 'tenant';
-    },
-  ) {
-    return this.prisma.skill.create({
-      data: {
-        tenantId: user.tenantId,
-        ownerUserId: user.userId,
-        name: body.name,
-        slug: body.slug,
-        description: body.description,
-        descriptionShort: body.descriptionShort,
-        bodyMd: body.bodyMd,
-        visibility: body.visibility ?? 'private',
-      },
-    });
+  get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.skills.get(user, id);
   }
 
   @Patch(':id')
-  @UseGuards(AdminGuard)
   async update(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body()
     body: Partial<{
-      name: string;
-      slug: string;
-      description: string;
-      descriptionShort: string;
-      bodyMd: string;
-      status: string;
+      enabled: boolean;
       visibility: 'private' | 'restricted' | 'tenant';
+      status: string;
     }>,
   ) {
     const existing = await this.prisma.skill.findFirst({
       where: { id, tenantId: user.tenantId },
     });
     if (!existing) throw new NotFoundException();
-    return this.prisma.skill.update({ where: { id }, data: body });
+    const isAdmin = user.role === 'owner' || user.role === 'admin';
+    if (!isAdmin && existing.ownerUserId !== user.userId) {
+      throw new NotFoundException();
+    }
+
+    if (typeof body.enabled === 'boolean') {
+      return this.skills.setEnabled(user, id, body.enabled);
+    }
+
+    return this.prisma.skill.update({
+      where: { id },
+      data: {
+        ...(body.visibility ? { visibility: body.visibility } : {}),
+        ...(body.status ? { status: body.status } : {}),
+      },
+    });
   }
 
   @Delete(':id')
   @UseGuards(AdminGuard)
-  async remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-    const existing = await this.prisma.skill.findFirst({
-      where: { id, tenantId: user.tenantId },
-    });
-    if (!existing) throw new NotFoundException();
-    await this.prisma.skill.update({
-      where: { id },
-      data: { status: 'disabled' },
-    });
-    return { ok: true };
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.skills.remove(user, id);
   }
 }

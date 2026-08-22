@@ -87,6 +87,7 @@ model Tenant {
   experts          Expert[]
   knowledgeBindings KnowledgeBinding[]
   defaultAgent     DefaultAgent?
+  llmProviders     LlmProvider[]
   modelConfigs     ModelConfig[]
   sessions         Session[]
   attachments      Attachment[]
@@ -190,6 +191,10 @@ model Connector {
   authType       String       @default("none") @map("auth_type")
   credentialsEnc String?      @db.Text @map("credentials_enc")
   healthStatus   HealthStatus @default(unknown) @map("health_status")
+  mcpInstructions String?     @map("mcp_instructions") @db.LongText
+  mcpServerName   String?     @map("mcp_server_name")
+  mcpServerVersion String?    @map("mcp_server_version")
+  mcpSyncedAt     DateTime?   @map("mcp_synced_at")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
@@ -302,43 +307,67 @@ model DefaultAgent {
   @@map("default_agents")
 }
 
+model LlmProvider {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  preset     String // minimax | anthropic
+  name       String
+  baseUrl    String   @map("base_url")
+  apiKeyEnc  String   @map("api_key_enc") @db.Text
+  enabled    Boolean  @default(true)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  models ModelConfig[]
+
+  @@index([tenantId, enabled])
+  @@map("llm_providers")
+}
+
 model ModelConfig {
   id               String   @id @default(cuid())
   tenantId         String   @map("tenant_id")
+  providerId       String?  @map("provider_id")
   modelId          String   @map("model_id")
   displayName      String   @map("display_name")
-  isAutoCandidate  Boolean  @default(true) @map("is_auto_candidate")
+  isAutoCandidate  Boolean  @default(false) @map("is_auto_candidate")
   enabled          Boolean  @default(true)
   sortOrder        Int      @default(0) @map("sort_order")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  provider LlmProvider? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  sessions Session[]
 
-  @@unique([tenantId, modelId])
+  @@unique([tenantId, providerId, modelId])
   @@index([tenantId, enabled])
   @@map("model_configs")
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
-  groupId   String   @map("group_id")
-  createdBy String   @map("created_by")
-  title     String?
-  expertId  String?  @map("expert_id")
-  modelId   String   @map("model_id")
-  status    String   @default("active")
-  context   Json     @default("{}")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  groupId       String   @map("group_id")
+  createdBy     String   @map("created_by")
+  title         String?
+  expertId      String?  @map("expert_id")
+  modelId       String   @map("model_id")
+  modelConfigId String?  @map("model_config_id")
+  status        String   @default("active")
+  context       Json     @default("{}")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  group    Group     @relation(fields: [groupId], references: [id])
-  creator  User      @relation(fields: [createdBy], references: [id])
-  expert   Expert?   @relation(fields: [expertId], references: [id])
-  messages Message[]
-  runs     AgentRun[]
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  group       Group        @relation(fields: [groupId], references: [id])
+  creator     User         @relation(fields: [createdBy], references: [id])
+  expert      Expert?      @relation(fields: [expertId], references: [id])
+  modelConfig ModelConfig? @relation(fields: [modelConfigId], references: [id], onDelete: SetNull)
+  messages    Message[]
+  runs        AgentRun[]
 
   @@index([tenantId, groupId, createdBy])
   @@map("sessions")

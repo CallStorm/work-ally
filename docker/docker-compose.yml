@@ -11,6 +11,7 @@ services:
       - "3306:3306"
     volumes:
       - workally_mysql:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
     command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]

@@ -1,5 +1,7 @@
-import PlaceholderPage from '@/components/placeholder-page';
+'use client';
 
-export default function Page() {
-  return <PlaceholderPage title="技能" />;
+import SkillsMarketPage from '@/components/skills-market-page';
+
+export default function WorkbenchSkillsPage() {
+  return <SkillsMarketPage />;
 }

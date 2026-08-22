@@ -72,16 +72,6 @@ export class AuthService {
           knowledgeIds: [],
         },
       });
-      await tx.modelConfig.create({
-        data: {
-          tenantId: tenant.id,
-          modelId: 'auto',
-          displayName: 'Auto',
-          isAutoCandidate: true,
-          enabled: true,
-          sortOrder: 0,
-        },
-      });
       return { user, tenant, group };
     });
 

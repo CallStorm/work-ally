@@ -58,7 +58,10 @@ export type SessionContext = z.infer<typeof SessionContextSchema>;
 export const CreateSessionSchema = z.object({
   groupId: z.string().min(1),
   expertId: z.string().nullable().optional(),
-  modelId: z.string().min(1).default('auto'),
+  /** Preferred: ModelConfig.id from GET /models */
+  modelConfigId: z.string().min(1),
+  /** Denormalized / legacy; ignored when modelConfigId resolves */
+  modelId: z.string().min(1).optional(),
   content: z.string().min(1),
   attachmentIds: z.array(z.string()).default([]),
   context: SessionContextSchema.default({

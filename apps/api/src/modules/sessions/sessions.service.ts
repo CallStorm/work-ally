@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -7,12 +8,14 @@ import { CreateSessionSchema, type CreateSessionInput } from '@work-ally/shared'
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../../common/current-user.decorator';
 import { RuntimeService } from '../runtime/runtime.service';
+import { AclService } from '../acl/acl.service';
 
 @Injectable()
 export class SessionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly runtime: RuntimeService,
+    private readonly acl: AclService,
   ) {}
 
   async list(user: AuthUser, groupId?: string) {
@@ -54,6 +57,20 @@ export class SessionsService {
     const input = CreateSessionSchema.parse(raw);
     await this.assertGroupAccess(user, input.groupId);
 
+    const modelConfig = await this.prisma.modelConfig.findFirst({
+      where: {
+        id: input.modelConfigId,
+        tenantId: user.tenantId,
+        enabled: true,
+        providerId: { not: null },
+      },
+    });
+    if (!modelConfig) {
+      throw new BadRequestException(
+        '请选择已启用的模型（Admin → 模型配置中添加 Provider 并同步模型）',
+      );
+    }
+
     if (input.expertId) {
       const expert = await this.prisma.expert.findFirst({
         where: {
@@ -62,7 +79,9 @@ export class SessionsService {
           status: 'active',
         },
       });
-      if (!expert) throw new NotFoundException('Expert not found');
+      if (!expert || !(await this.acl.canUse(user, 'experts', expert))) {
+        throw new NotFoundException('Expert not found');
+      }
       await this.prisma.expertUsage.create({
         data: { expertId: expert.id, userId: user.userId },
       });
@@ -80,7 +99,8 @@ export class SessionsService {
         createdBy: user.userId,
         title,
         expertId: input.expertId ?? null,
-        modelId: input.modelId,
+        modelId: modelConfig.modelId,
+        modelConfigId: modelConfig.id,
         context: input.context,
         messages: {
           create: {
@@ -104,7 +124,6 @@ export class SessionsService {
       },
     });
 
-    // Fire-and-forget for SSE clients; also await for simpler clients via wait flag later
     const execution = this.runtime.executeRun(run.id);
 
     return {
