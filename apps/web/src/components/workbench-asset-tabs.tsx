@@ -93,9 +93,9 @@ export default function WorkbenchAssetTabs() {
               fontSize: 14,
               fontWeight: active ? 650 : 500,
               textDecoration: 'none',
-              color: active ? '#fff' : '#64748b',
-              background: active ? '#0f172a' : 'transparent',
-              border: active ? 'none' : '1px solid transparent',
+              color: active ? 'var(--wb-accent)' : 'var(--wb-muted)',
+              background: active ? 'var(--wb-accent-soft)' : 'transparent',
+              border: active ? '1px solid transparent' : '1px solid transparent',
               transition: 'background 0.15s ease, color 0.15s ease',
             }}
           >

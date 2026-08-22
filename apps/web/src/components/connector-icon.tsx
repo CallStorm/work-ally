@@ -35,21 +35,29 @@ function getConnectorVisual(name: string): ConnectorVisual {
   };
 }
 
-export default function ConnectorIcon({ name }: { name: string }) {
+export default function ConnectorIcon({
+  name,
+  size = 40,
+}: {
+  name: string;
+  size?: number;
+}) {
   const visual = getConnectorVisual(name);
+  const radius = Math.max(6, Math.round(size * 0.25));
+  const fontSize = (visual.fontSize ?? 16) * (size / 40);
   return (
     <div
       aria-hidden
       style={{
-        width: 40,
-        height: 40,
-        borderRadius: 10,
+        width: size,
+        height: size,
+        borderRadius: radius,
         background: visual.bg,
         color: visual.fg,
         display: 'grid',
         placeItems: 'center',
         fontWeight: 700,
-        fontSize: visual.fontSize ?? 16,
+        fontSize,
         flexShrink: 0,
         boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.08)',
       }}
