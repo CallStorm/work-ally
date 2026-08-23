@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -11,8 +12,11 @@ import { UpdateAclSchema } from '@work-ally/shared';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
 import { AdminGuard } from '../../common/admin.guard';
 import { CurrentUser, type AuthUser } from '../../common/current-user.decorator';
+import { parseBody } from '../../common/zod';
 import { AclService, type AssetKind } from './acl.service';
 import { PrismaService } from '../../prisma/prisma.service';
+
+const TENANT_ONLY_ASSETS: AssetKind[] = ['connectors', 'skills'];
 
 @Controller('resources')
 @UseGuards(JwtAuthGuard)
@@ -43,7 +47,18 @@ export class AclController {
     @Body() body: unknown,
   ) {
     await this.assertExists(user, type, id);
-    const input = UpdateAclSchema.parse(body);
+    const input = parseBody(UpdateAclSchema, body);
+    if (TENANT_ONLY_ASSETS.includes(type) && input.visibility !== 'tenant') {
+      throw new BadRequestException('MCP 与技能仅支持全公司可见');
+    }
+    if (type === 'experts' && input.visibility === 'restricted') {
+      const groupEntries = input.entries.filter(
+        (e) => e.principalType === 'group',
+      );
+      if (groupEntries.length === 0) {
+        throw new BadRequestException('按组分享至少选择一个组');
+      }
+    }
     await this.setVisibility(type, id, input.visibility);
     const entries = await this.acl.setAcl(user, type, id, {
       visibility: input.visibility,

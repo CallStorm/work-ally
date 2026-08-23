@@ -43,9 +43,7 @@ export class SkillsController {
     @UploadedFile() file: Express.Multer.File,
     @Body() body: { visibility?: 'private' | 'restricted' | 'tenant' },
   ) {
-    const isAdmin = user.role === 'owner' || user.role === 'admin';
-    const visibility =
-      body.visibility ?? (isAdmin ? 'tenant' : 'private');
+    const visibility = 'tenant' as const;
     return this.skills.uploadZip(user, file, visibility);
   }
 
@@ -69,7 +67,7 @@ export class SkillsController {
       where: { id, tenantId: user.tenantId },
     });
     if (!existing) throw new NotFoundException();
-    const isAdmin = user.role === 'owner' || user.role === 'admin';
+    const isAdmin = user.role === 'admin';
     if (!isAdmin && existing.ownerUserId !== user.userId) {
       throw new NotFoundException();
     }
@@ -81,7 +79,7 @@ export class SkillsController {
     return this.prisma.skill.update({
       where: { id },
       data: {
-        ...(body.visibility ? { visibility: body.visibility } : {}),
+        visibility: 'tenant',
         ...(body.status ? { status: body.status } : {}),
       },
     });

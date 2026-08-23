@@ -11,6 +11,11 @@ import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ExpertAvatar, ExpertFormDialog } from './expert-form-dialog';
+import {
+  ExpertGroupShareDialog,
+  expertVisibilityLabel,
+  setExpertVisibility,
+} from './expert-share-dialog';
 
 type Expert = {
   id: string;
@@ -55,6 +60,7 @@ export default function AdminExpertsPage() {
   const [editing, setEditing] = useState<Expert | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [shareExpert, setShareExpert] = useState<Expert | null>(null);
 
   async function refresh() {
     const [expertList, skillList, connectorList] = await Promise.all([
@@ -73,7 +79,7 @@ export default function AdminExpertsPage() {
 
   useEffect(() => {
     if (!auth) return;
-    if (auth.user.role !== 'owner' && auth.user.role !== 'admin') {
+    if (auth.user.role !== 'admin') {
       router.replace('/workbench');
       return;
     }
@@ -115,16 +121,13 @@ export default function AdminExpertsPage() {
     }
   }
 
-  async function shareTenant(id: string) {
+  async function sharePrivate(id: string) {
     setMenuId(null);
     try {
-      await apiFetch(`/resources/experts/${id}/acl`, {
-        method: 'PUT',
-        body: JSON.stringify({ visibility: 'tenant', entries: [] }),
-      });
+      await setExpertVisibility(id, 'private');
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '分享失败');
+      setError(err instanceof Error ? err.message : '设置失败');
     }
   }
 
@@ -306,11 +309,32 @@ export default function AdminExpertsPage() {
               }
               onToggle={() => void toggleStatus(expert)}
               onEdit={() => openEdit(expert)}
-              onShare={() => void shareTenant(expert.id)}
+              onShareTenant={() => {
+                setMenuId(null);
+                void setExpertVisibility(expert.id, 'tenant')
+                  .then(refresh)
+                  .catch((err) =>
+                    setError(err instanceof Error ? err.message : '设置失败'),
+                  );
+              }}
+              onShareGroups={() => {
+                setMenuId(null);
+                setShareExpert(expert);
+              }}
+              onSharePrivate={() => void sharePrivate(expert.id)}
               onDelete={() => void removeExpert(expert)}
             />
           ))}
         </div>
+      )}
+
+      {shareExpert && (
+        <ExpertGroupShareDialog
+          expertId={shareExpert.id}
+          expertName={shareExpert.name}
+          onClose={() => setShareExpert(null)}
+          onSaved={() => void refresh()}
+        />
       )}
 
       {dialogOpen && (
@@ -386,7 +410,9 @@ function ExpertCard({
   onToggleMenu,
   onToggle,
   onEdit,
-  onShare,
+  onShareTenant,
+  onShareGroups,
+  onSharePrivate,
   onDelete,
 }: {
   expert: Expert;
@@ -395,7 +421,9 @@ function ExpertCard({
   onToggleMenu: () => void;
   onToggle: () => void;
   onEdit: () => void;
-  onShare: () => void;
+  onShareTenant: () => void;
+  onShareGroups: () => void;
+  onSharePrivate: () => void;
   onDelete: () => void;
 }) {
   const active = expert.status === 'active';
@@ -449,7 +477,7 @@ function ExpertCard({
               padding: '2px 8px',
             }}
           >
-            {expert.visibility === 'tenant' ? '全公司' : '自定义'}
+            {expertVisibilityLabel(expert.visibility)}
           </span>
         </div>
         <p
@@ -538,7 +566,9 @@ function ExpertCard({
               }}
             >
               <MenuItem onClick={onEdit}>编辑</MenuItem>
-              <MenuItem onClick={onShare}>分享到全公司</MenuItem>
+              <MenuItem onClick={onShareTenant}>全公司可用</MenuItem>
+              <MenuItem onClick={onShareGroups}>按组分享…</MenuItem>
+              <MenuItem onClick={onSharePrivate}>仅管理员</MenuItem>
               <MenuItem onClick={onDelete} danger>
                 删除
               </MenuItem>

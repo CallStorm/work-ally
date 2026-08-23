@@ -9,7 +9,6 @@ datasource db {
 }
 
 enum MembershipRole {
-  owner
   admin
   member
 }
@@ -98,7 +97,7 @@ model Tenant {
 
 model User {
   id           String   @id @default(cuid())
-  email        String   @unique
+  phone        String   @unique
   name         String
   passwordHash String   @map("password_hash")
   avatarUrl    String?  @map("avatar_url")
@@ -138,6 +137,7 @@ model Group {
   tenantId    String   @map("tenant_id")
   name        String
   description String?  @db.Text
+  isDefault   Boolean  @default(false) @map("is_default")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

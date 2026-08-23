@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import {
+  useEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -28,6 +29,8 @@ type Expert = {
 };
 
 type Named = { id: string; name: string };
+
+type ShareScope = 'private' | 'tenant' | 'groups';
 
 type AssistResult = {
   name?: string;
@@ -170,14 +173,46 @@ export function ExpertFormDialog({
   const [connectorIds, setConnectorIds] = useState<string[]>(
     editing?.connectorIds ?? [],
   );
-  const [visibility, setVisibility] = useState<'private' | 'tenant'>(
-    editing?.visibility === 'tenant' ? 'tenant' : 'private',
+  const [visibility, setVisibility] = useState<ShareScope>(
+    editing?.visibility === 'tenant'
+      ? 'tenant'
+      : editing?.visibility === 'restricted'
+        ? 'groups'
+        : 'private',
   );
+  const [groups, setGroups] = useState<Named[]>([]);
+  const [shareGroupIds, setShareGroupIds] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(!isCreate);
   const [saving, setSaving] = useState(false);
   const [aiBusy, setAiBusy] = useState<AssistTask | 'draft' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    void apiFetch<Named[]>('/groups')
+      .then(setGroups)
+      .catch(() => setGroups([]));
+    if (editing?.id) {
+      void apiFetch<{
+        visibility: string;
+        entries: Array<{ principalType: string; principalId: string }>;
+      }>(`/resources/experts/${editing.id}/acl`)
+        .then((acl) => {
+          if (acl.visibility === 'tenant') setVisibility('tenant');
+          else if (acl.visibility === 'restricted') {
+            setVisibility('groups');
+            setShareGroupIds(
+              acl.entries
+                .filter((e) => e.principalType === 'group')
+                .map((e) => e.principalId),
+            );
+          } else {
+            setVisibility('private');
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [editing?.id]);
 
   const selectedPresetId =
     parseAvatarUrl(avatarUrl).preset?.id ??
@@ -251,7 +286,6 @@ export function ExpertFormDialog({
       skillIds,
       connectorIds,
       knowledgeIds: [] as string[],
-      visibility,
     };
     if (!body.name) {
       setError('请填写名称');
@@ -261,17 +295,43 @@ export function ExpertFormDialog({
       setError('请填写规则，或使用 AI 生成');
       return;
     }
+    if (visibility === 'groups' && shareGroupIds.length === 0) {
+      setError('按组分享请至少选择一个组');
+      return;
+    }
     setSaving(true);
     try {
+      let expertId = editing?.id;
       if (editing) {
         await apiFetch(`/experts/${editing.id}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
       } else {
-        await apiFetch('/experts', {
+        const created = await apiFetch<{ id: string }>('/experts', {
           method: 'POST',
-          body: JSON.stringify(body),
+          body: JSON.stringify({ ...body, visibility: 'private' }),
+        });
+        expertId = created.id;
+      }
+      if (expertId) {
+        await apiFetch(`/resources/experts/${expertId}/acl`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            visibility:
+              visibility === 'groups'
+                ? 'restricted'
+                : visibility === 'tenant'
+                  ? 'tenant'
+                  : 'private',
+            entries:
+              visibility === 'groups'
+                ? shareGroupIds.map((groupId) => ({
+                    principalType: 'group',
+                    principalId: groupId,
+                  }))
+                : [],
+          }),
         });
       }
       await onSaved();
@@ -591,14 +651,48 @@ export function ExpertFormDialog({
               <select
                 value={visibility}
                 onChange={(e) =>
-                  setVisibility(e.target.value as 'private' | 'tenant')
+                  setVisibility(e.target.value as ShareScope)
                 }
                 style={field}
               >
-                <option value="private">仅管理员配置（私有）</option>
+                <option value="private">仅管理员</option>
                 <option value="tenant">全公司可用</option>
+                <option value="groups">指定组</option>
               </select>
             </label>
+            {visibility === 'groups' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {groups.length === 0 && (
+                  <span style={{ fontSize: 13, color: '#64748b' }}>
+                    暂无工作组
+                  </span>
+                )}
+                {groups.map((g) => (
+                  <label
+                    key={g.id}
+                    style={{
+                      display: 'flex',
+                      gap: 6,
+                      alignItems: 'center',
+                      fontSize: 13,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={shareGroupIds.includes(g.id)}
+                      onChange={() =>
+                        setShareGroupIds((cur) =>
+                          cur.includes(g.id)
+                            ? cur.filter((x) => x !== g.id)
+                            : [...cur, g.id],
+                        )
+                      }
+                    />
+                    {g.name}
+                  </label>
+                ))}
+              </div>
+            )}
           </Section>
         )}
 

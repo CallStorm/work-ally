@@ -35,7 +35,7 @@ export class ConnectorsController {
     @CurrentUser() user: AuthUser,
     @Query('all') all?: string,
   ) {
-    const isAdmin = user.role === 'owner' || user.role === 'admin';
+    const isAdmin = user.role === 'admin';
     const items = await this.prisma.connector.findMany({
       where: {
         tenantId: user.tenantId,
@@ -96,7 +96,7 @@ export class ConnectorsController {
           ? encryptSecret(body.credentials, secret)
           : null,
         ownerUserId: user.userId,
-        visibility: body.visibility ?? 'private',
+        visibility: 'tenant',
       },
     });
     return sanitizeConnector(item);
@@ -140,7 +140,7 @@ export class ConnectorsController {
         endpointUrl: body.endpointUrl,
         authType: body.authType,
         status,
-        visibility: body.visibility,
+        visibility: 'tenant',
         ...(body.credentials !== undefined
           ? {
               credentialsEnc: body.credentials

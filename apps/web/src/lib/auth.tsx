@@ -15,13 +15,14 @@ import {
   saveAuth,
   type StoredAuth,
 } from '@/lib/api';
+import { GROUP_STORAGE_KEY } from '@/lib/group';
 
 type AuthContextValue = {
   auth: StoredAuth | null;
   ready: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<void>;
   register: (input: {
-    email: string;
+    phone: string;
     password: string;
     name: string;
     tenantName: string;
@@ -40,10 +41,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setReady(true);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (phone: string, password: string) => {
     const data = await apiFetch<StoredAuth>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ phone, password }),
     });
     saveAuth(data);
     setAuth(data);
@@ -51,7 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const register = useCallback(
     async (input: {
-      email: string;
+      phone: string;
       password: string;
       name: string;
       tenantName: string;
@@ -68,6 +69,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     clearAuth();
+    try {
+      localStorage.removeItem(GROUP_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
     setAuth(null);
   }, []);
 

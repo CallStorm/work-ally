@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 API="${API_BASE:-http://127.0.0.1:3001/api}"
-EMAIL="acl-smoke-$(date +%s)@example.com"
+PHONE="138$(date +%s | tail -c 9)"
 
 REG=$(curl -sf -X POST "$API/auth/register" -H 'content-type: application/json' \
-  -d "{\"email\":\"$EMAIL\",\"password\":\"pass123456\",\"name\":\"Acl Admin\",\"tenantName\":\"Acl Corp\"}")
+  -d "{\"phone\":\"$PHONE\",\"password\":\"pass123456\",\"name\":\"Acl Admin\",\"tenantName\":\"Acl Corp\"}")
 TOKEN=$(echo "$REG" | node -e "let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>console.log(JSON.parse(d).accessToken))")
 AUTH="authorization: Bearer $TOKEN"
 

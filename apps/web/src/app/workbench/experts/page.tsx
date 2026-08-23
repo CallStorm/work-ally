@@ -99,7 +99,7 @@ export default function WorkbenchExpertsPage() {
           }}
         >
           暂无可用专家。
-          {(auth.user.role === 'owner' || auth.user.role === 'admin') && (
+          {auth.user.role === 'admin' && (
             <>
               {' '}
               <Link href="/admin/experts" style={{ color: '#3b82f6' }}>

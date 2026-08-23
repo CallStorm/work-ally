@@ -8,7 +8,7 @@ export default function LoginPage() {
   const { login, register } = useAuth();
   const router = useRouter();
   const [mode, setMode] = useState<'login' | 'register'>('register');
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('办公同学');
   const [tenantName, setTenantName] = useState('演示公司');
@@ -21,9 +21,9 @@ export default function LoginPage() {
     setError(null);
     try {
       if (mode === 'login') {
-        await login(email, password);
+        await login(phone, password);
       } else {
-        await register({ email, password, name, tenantName });
+        await register({ phone, password, name, tenantName });
       }
       router.replace('/workbench');
     } catch (err) {
@@ -58,7 +58,7 @@ export default function LoginPage() {
           {mode === 'login' ? '登录 WorkAlly' : '注册并创建租户'}
         </h1>
         <p style={{ margin: 0, color: 'var(--muted)', fontSize: 14 }}>
-          对接对话流前需要账号；注册会自动创建默认组与默认 Agent。
+          使用手机号登录；注册会自动创建默认组与默认 Agent。
         </p>
         {mode === 'register' && (
           <>
@@ -80,10 +80,12 @@ export default function LoginPage() {
         )}
         <input
           required
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="邮箱"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="手机号"
           style={inputStyle}
         />
         <input

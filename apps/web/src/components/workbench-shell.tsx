@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useCurrentGroup } from '@/lib/group-context';
 import type { SessionListItem } from '@/lib/types';
 
 const SIDEBAR_KEY = 'workbench.sidebarCollapsed';
@@ -53,6 +54,8 @@ export default function WorkbenchShell({
   children: React.ReactNode;
 }) {
   const { auth, ready, logout } = useAuth();
+  const { groups, currentGroupId, currentGroup, setCurrentGroupId } =
+    useCurrentGroup();
   const router = useRouter();
   const pathname = usePathname();
   const [sessions, setSessions] = useState<SessionListItem[]>([]);
@@ -64,8 +67,7 @@ export default function WorkbenchShell({
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const userMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const isAdmin =
-    auth?.user.role === 'owner' || auth?.user.role === 'admin';
+  const isAdmin = auth?.user.role === 'admin';
 
   useEffect(() => {
     if (ready && !auth) router.replace('/login');
@@ -119,13 +121,13 @@ export default function WorkbenchShell({
   }, [userMenuOpen]);
 
   useEffect(() => {
-    if (!auth?.defaultGroupId) return;
+    if (!currentGroupId) return;
     void apiFetch<SessionListItem[]>(
-      `/sessions?group_id=${auth.defaultGroupId}`,
+      `/sessions?group_id=${currentGroupId}`,
     )
       .then(setSessions)
       .catch(() => setSessions([]));
-  }, [auth, pathname]);
+  }, [currentGroupId, pathname]);
 
   const activeSessionId = useMemo(() => {
     const match = pathname.match(/^\/workbench\/sessions\/([^/?]+)/);
@@ -290,8 +292,13 @@ export default function WorkbenchShell({
               {(auth?.user.name ?? '?').charAt(0).toUpperCase()}
             </span>
             {!sidebarCollapsed && (
-              <span className="workbench-user-trigger__name">
-                {auth?.user.name ?? '未登录'}
+              <span className="workbench-user-trigger__meta">
+                <span className="workbench-user-trigger__name">
+                  {auth?.user.name ?? '未登录'}
+                </span>
+                <span className="workbench-user-trigger__group">
+                  {currentGroup?.name ?? '未选择工作组'}
+                </span>
               </span>
             )}
           </button>
@@ -299,7 +306,55 @@ export default function WorkbenchShell({
           {userMenuOpen && (
             <div className="workbench-user-menu" role="menu">
               <div className="workbench-user-menu__head">
-                {auth?.user.name ?? '未登录'}
+                <div className="workbench-user-menu__name">
+                  {auth?.user.name ?? '未登录'}
+                </div>
+                {auth?.user.phone && (
+                  <div className="workbench-user-menu__sub">
+                    {auth.user.phone}
+                  </div>
+                )}
+              </div>
+
+              <div className="workbench-user-menu__section">
+                <div className="workbench-user-menu__section-title">
+                  <NavIconGroup />
+                  当前工作组
+                </div>
+                {groups.length === 0 ? (
+                  <div className="workbench-user-menu__empty">暂无工作组</div>
+                ) : (
+                  <div
+                    className="workbench-user-menu__group-list"
+                    role="menu"
+                    aria-label="切换工作组"
+                  >
+                    {groups.map((g) => {
+                      const active = g.id === currentGroupId;
+                      return (
+                        <button
+                          key={g.id}
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={active}
+                          className={`workbench-user-menu__group-item${active ? ' is-active' : ''}`}
+                          onClick={() => {
+                            setCurrentGroupId(g.id);
+                            setUserMenuOpen(false);
+                          }}
+                        >
+                          <span className="workbench-user-menu__group-check">
+                            {active ? '✓' : ''}
+                          </span>
+                          <span className="workbench-user-menu__group-label">
+                            {g.name}
+                            {g.isDefault ? '（默认）' : ''}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               <div className="workbench-user-menu__row">
@@ -487,6 +542,21 @@ function NavIconKnowledge() {
         strokeWidth="1.6"
       />
       <path d="M8 5.5V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.5" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+function NavIconGroup() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="9" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="16" cy="9" r="2" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M4.5 18c.8-2.2 2.4-3.5 4.5-3.5s3.7 1.3 4.5 3.5M13.5 17.5c.5-1.3 1.6-2 3-2s2.5.7 3 2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }

@@ -5,7 +5,7 @@ export type AuthUser = {
   userId: string;
   tenantId: string;
   role: MembershipRole;
-  email: string;
+  phone: string;
   name: string;
 };
 

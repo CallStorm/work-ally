@@ -11,7 +11,7 @@ export class AuthController {
   register(
     @Body()
     body: {
-      email: string;
+      phone: string;
       password: string;
       name: string;
       tenantName: string;
@@ -21,13 +21,19 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() body: { email: string; password: string }) {
-    return this.auth.login(body.email, body.password);
+  login(@Body() body: { phone: string; password: string }) {
+    return this.auth.login(body.phone, body.password);
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: AuthUser) {
     return this.auth.me(user);
+  }
+
+  @Get('me/groups')
+  @UseGuards(JwtAuthGuard)
+  myGroups(@CurrentUser() user: AuthUser) {
+    return this.auth.myGroups(user);
   }
 }

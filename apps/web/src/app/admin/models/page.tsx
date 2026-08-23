@@ -109,7 +109,7 @@ export default function AdminModelsPage() {
 
   useEffect(() => {
     if (!auth) return;
-    if (auth.user.role !== 'owner' && auth.user.role !== 'admin') {
+    if (auth.user.role !== 'admin') {
       router.replace('/workbench');
       return;
     }

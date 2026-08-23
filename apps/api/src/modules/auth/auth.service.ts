@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
+import { normalizePhone } from '@work-ally/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../../common/current-user.decorator';
 
@@ -16,23 +17,28 @@ export class AuthService {
   ) {}
 
   async register(input: {
-    email: string;
+    phone: string;
     password: string;
     name: string;
     tenantName: string;
   }) {
+    const phone = normalizePhone(input.phone);
+    if (!/^1\d{10}$/.test(phone)) {
+      throw new BadRequestException('请输入有效的11位手机号');
+    }
+
     const existing = await this.prisma.user.findUnique({
-      where: { email: input.email.toLowerCase() },
+      where: { phone },
     });
     if (existing) {
-      throw new BadRequestException('Email already registered');
+      throw new BadRequestException('该手机号已注册');
     }
 
     const passwordHash = await bcrypt.hash(input.password, 10);
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
-          email: input.email.toLowerCase(),
+          phone,
           name: input.name,
           passwordHash,
         },
@@ -44,7 +50,7 @@ export class AuthService {
         data: {
           tenantId: tenant.id,
           userId: user.id,
-          role: 'owner',
+          role: 'admin',
           status: 'active',
         },
       });
@@ -53,6 +59,7 @@ export class AuthService {
           tenantId: tenant.id,
           name: '默认组',
           description: '系统自动创建',
+          isDefault: true,
         },
       });
       await tx.groupMember.create({
@@ -75,45 +82,68 @@ export class AuthService {
       return { user, tenant, group };
     });
 
-    return this.issueToken({
-      userId: result.user.id,
-      tenantId: result.tenant.id,
-      role: 'owner',
-      email: result.user.email,
-      name: result.user.name,
-    }, {
-      groupId: result.group.id,
-      tenantId: result.tenant.id,
-    });
+    return this.issueToken(
+      {
+        userId: result.user.id,
+        tenantId: result.tenant.id,
+        role: 'admin',
+        phone: result.user.phone,
+        name: result.user.name,
+      },
+      {
+        groupId: result.group.id,
+        tenantId: result.tenant.id,
+      },
+    );
   }
 
-  async login(email: string, password: string) {
+  async login(phoneInput: string, password: string) {
+    const phone = normalizePhone(phoneInput);
     const user = await this.prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { phone },
       include: { memberships: { where: { status: 'active' }, take: 1 } },
     });
     if (!user || user.memberships.length === 0) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('手机号或密码错误');
     }
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('手机号或密码错误');
     }
     const membership = user.memberships[0];
     const group = await this.prisma.groupMember.findFirst({
       where: { userId: user.id, group: { tenantId: membership.tenantId } },
       include: { group: true },
+      orderBy: { joinedAt: 'asc' },
     });
     return this.issueToken(
       {
         userId: user.id,
         tenantId: membership.tenantId,
         role: membership.role,
-        email: user.email,
+        phone: user.phone,
         name: user.name,
       },
       { groupId: group?.groupId ?? null, tenantId: membership.tenantId },
     );
+  }
+
+  async myGroups(user: AuthUser) {
+    const memberships = await this.prisma.groupMember.findMany({
+      where: {
+        userId: user.userId,
+        group: { tenantId: user.tenantId },
+      },
+      include: { group: true },
+      orderBy: [{ group: { isDefault: 'desc' } }, { joinedAt: 'asc' }],
+    });
+    return {
+      groups: memberships.map((m) => ({
+        id: m.group.id,
+        name: m.group.name,
+        isDefault: m.group.isDefault,
+      })),
+    };
   }
 
   me(user: AuthUser) {
@@ -128,7 +158,7 @@ export class AuthService {
       sub: user.userId,
       tenantId: user.tenantId,
       role: user.role,
-      email: user.email,
+      phone: user.phone,
       name: user.name,
     });
     return {

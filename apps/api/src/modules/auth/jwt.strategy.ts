@@ -9,7 +9,7 @@ type JwtPayload = {
   sub: string;
   tenantId: string;
   role: MembershipRole;
-  email: string;
+  phone: string;
   name: string;
 };
 
@@ -32,7 +32,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       userId: payload.sub,
       tenantId: payload.tenantId,
       role: payload.role,
-      email: payload.email,
+      phone: payload.phone,
       name: payload.name,
     };
   }

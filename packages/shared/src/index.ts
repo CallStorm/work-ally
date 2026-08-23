@@ -1,8 +1,22 @@
 import { z } from 'zod';
 
 /** Tenant membership roles (frozen). */
-export const MembershipRole = z.enum(['owner', 'admin', 'member']);
+export const MembershipRole = z.enum(['admin', 'member']);
 export type MembershipRole = z.infer<typeof MembershipRole>;
+
+/** Normalize phone to digits only. */
+export function normalizePhone(input: string): string {
+  return input.replace(/\D/g, '');
+}
+
+/** Chinese mobile: 11 digits starting with 1. */
+export const PhoneSchema = z
+  .string()
+  .min(1, '请填写手机号')
+  .transform(normalizePhone)
+  .refine((v) => /^1\d{10}$/.test(v), {
+    message: '手机号格式无效，需为11位数字且以1开头',
+  });
 
 /** Resource visibility (frozen ACL). */
 export const Visibility = z.enum(['private', 'restricted', 'tenant']);
@@ -79,6 +93,31 @@ export const UpdateAclSchema = z.object({
   entries: z.array(AclEntrySchema).default([]),
 });
 export type UpdateAclInput = z.infer<typeof UpdateAclSchema>;
+
+export const CreateMemberSchema = z.object({
+  phone: PhoneSchema,
+  name: z.string().min(1).max(64),
+  password: z.string().min(6).max(128),
+  role: MembershipRole.default('member'),
+  groupIds: z.array(z.string()).default([]),
+});
+export type CreateMemberInput = z.infer<typeof CreateMemberSchema>;
+
+export const UpdateMemberSchema = z
+  .object({
+    role: MembershipRole.optional(),
+    status: z.enum(['active', 'disabled']).optional(),
+    groupIds: z.array(z.string()).optional(),
+  })
+  .refine((v) => v.role !== undefined || v.status !== undefined || v.groupIds !== undefined, {
+    message: '至少提供一个更新字段',
+  });
+export type UpdateMemberInput = z.infer<typeof UpdateMemberSchema>;
+
+export const ResetMemberPasswordSchema = z.object({
+  password: z.string().min(6).max(128),
+});
+export type ResetMemberPasswordInput = z.infer<typeof ResetMemberPasswordSchema>;
 
 export const APP_NAME = 'WorkAlly';
 export const API_PREFIX = '/api';

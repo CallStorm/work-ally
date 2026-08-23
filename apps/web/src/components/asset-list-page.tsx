@@ -52,7 +52,7 @@ export default function AssetListPage({
   }
 
   const isAdmin =
-    auth.user.role === 'owner' || auth.user.role === 'admin';
+    auth.user.role === 'admin';
 
   return (
     <main style={{ padding: 28, display: 'grid', gap: 16 }}>

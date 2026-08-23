@@ -45,7 +45,6 @@ export class SessionsService {
     if (!session) throw new NotFoundException('Session not found');
     if (
       session.createdBy !== user.userId &&
-      user.role !== 'owner' &&
       user.role !== 'admin'
     ) {
       throw new ForbiddenException();
@@ -169,7 +168,6 @@ export class SessionsService {
     if (!group) throw new NotFoundException('Group not found');
     if (
       group.members.length === 0 &&
-      user.role !== 'owner' &&
       user.role !== 'admin'
     ) {
       throw new ForbiddenException('Not a member of this group');

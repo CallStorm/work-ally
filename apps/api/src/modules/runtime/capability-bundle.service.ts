@@ -25,6 +25,7 @@ export class CapabilityBundleService {
   async resolveForSession(session: {
     id: string;
     tenantId: string;
+    groupId: string;
     createdBy: string;
     expertId: string | null;
     modelId: string;
@@ -39,6 +40,16 @@ export class CapabilityBundleService {
     } | null;
   }): Promise<AgentBundle> {
     const user = await this.resolveAuthUser(session.tenantId, session.createdBy);
+    const [tenant, group] = await Promise.all([
+      this.prisma.tenant.findUnique({
+        where: { id: session.tenantId },
+        select: { name: true },
+      }),
+      this.prisma.group.findFirst({
+        where: { id: session.groupId, tenantId: session.tenantId },
+        select: { name: true },
+      }),
+    ]);
     const ctx = normalizeContext(session.context);
 
     let mode: 'expert' | 'default' = 'default';
@@ -88,8 +99,17 @@ export class CapabilityBundleService {
       .map((k) => `- ${k.displayName} (${k.provider}) ${k.baseUrl}`)
       .join('\n');
 
+    const userContext = buildUserContextBlock({
+      name: user.name,
+      phone: user.phone,
+      role: user.role,
+      tenantName: tenant?.name ?? '',
+      groupName: group?.name ?? '',
+    });
+
     const instructions = [
       persona,
+      userContext,
       skillCatalog
         ? `\n\n## Available skills (load on demand via skill tools / read SKILL.md)\n${skillCatalog}`
         : '',
@@ -158,7 +178,7 @@ export class CapabilityBundleService {
         userId,
         tenantId,
         role: 'member',
-        email: '',
+        phone: '',
         name: '',
       };
     }
@@ -166,7 +186,7 @@ export class CapabilityBundleService {
       userId,
       tenantId,
       role: membership.role as MembershipRole,
-      email: membership.user.email,
+      phone: membership.user.phone,
       name: membership.user.name,
     };
   }
@@ -218,4 +238,32 @@ function normalizeContext(raw: unknown): SessionContextShape {
         : undefined,
     attachmentIds: asIds(obj.attachmentIds),
   };
+}
+
+function buildUserContextBlock(input: {
+  name: string;
+  phone: string;
+  role: MembershipRole;
+  tenantName: string;
+  groupName: string;
+}): string {
+  const roleLabel = input.role === 'admin' ? '管理员' : '成员';
+  const lines = [
+    '## 当前用户（工作台会话）',
+    '以下是正在与你对话的用户信息，请用于个性化称呼与办公场景理解：',
+    `- 姓名：${input.name || '（未设置）'}`,
+    `- 手机号：${input.phone || '（未设置）'}`,
+    `- 角色：${roleLabel}`,
+  ];
+  if (input.tenantName) {
+    lines.push(`- 公司/租户：${input.tenantName}`);
+  }
+  if (input.groupName) {
+    lines.push(`- 当前工作组：${input.groupName}`);
+  }
+  lines.push(
+    '',
+    '注意：除非用户明确要求，不要将手机号等敏感信息复述给第三方或写入外部系统。',
+  );
+  return lines.join('\n');
 }

@@ -20,7 +20,7 @@ export class AclService {
   constructor(private readonly prisma: PrismaService) {}
 
   isAdmin(user: AuthUser) {
-    return user.role === 'owner' || user.role === 'admin';
+    return user.role === 'admin';
   }
 
   async canUse(

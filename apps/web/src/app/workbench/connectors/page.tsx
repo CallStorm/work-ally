@@ -57,7 +57,7 @@ export default function WorkbenchConnectorsPage() {
   );
 
   const isAdmin =
-    auth?.user.role === 'owner' || auth?.user.role === 'admin';
+    auth?.user.role === 'admin';
 
   if (!ready || !auth) {
     return <main style={{ padding: 24, color: '#64748b' }}>加载中…</main>;

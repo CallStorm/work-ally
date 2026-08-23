@@ -7,7 +7,7 @@ export type StoredAuth = {
     userId: string;
     tenantId: string;
     role: string;
-    email: string;
+    phone: string;
     name: string;
   };
   defaultGroupId: string | null;

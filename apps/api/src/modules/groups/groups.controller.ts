@@ -3,31 +3,30 @@ import {
   Controller,
   Delete,
   Get,
-  NotFoundException,
   Param,
   Patch,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/jwt-auth.guard';
 import { AdminGuard } from '../../common/admin.guard';
 import { CurrentUser, type AuthUser } from '../../common/current-user.decorator';
-import { PrismaService } from '../../prisma/prisma.service';
+import { GroupsService } from './groups.service';
 
 @Controller('groups')
 @UseGuards(JwtAuthGuard)
 export class GroupsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly groups: GroupsService) {}
 
   @Get()
   list(@CurrentUser() user: AuthUser) {
-    return this.prisma.group.findMany({
-      where: { tenantId: user.tenantId },
-      include: {
-        _count: { select: { members: true } },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
+    return this.groups.list(user);
+  }
+
+  @Get(':id')
+  get(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.groups.get(user, id);
   }
 
   @Post()
@@ -36,61 +35,52 @@ export class GroupsController {
     @CurrentUser() user: AuthUser,
     @Body() body: { name: string; description?: string },
   ) {
-    return this.prisma.group.create({
-      data: {
-        tenantId: user.tenantId,
-        name: body.name,
-        description: body.description,
-      },
-    });
+    return this.groups.create(user, body);
   }
 
   @Patch(':id')
   @UseGuards(AdminGuard)
-  async update(
+  update(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: Partial<{ name: string; description: string }>,
   ) {
-    const existing = await this.prisma.group.findFirst({
-      where: { id, tenantId: user.tenantId },
-    });
-    if (!existing) throw new NotFoundException();
-    return this.prisma.group.update({ where: { id }, data: body });
+    return this.groups.update(user, id, body);
   }
 
-  @Post(':id/members')
+  @Delete(':id')
   @UseGuards(AdminGuard)
-  async addMembers(
+  remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.groups.remove(user, id);
+  }
+
+  @Put(':id/members')
+  @UseGuards(AdminGuard)
+  setMembers(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() body: { userIds: string[] },
   ) {
-    const group = await this.prisma.group.findFirst({
-      where: { id, tenantId: user.tenantId },
-    });
-    if (!group) throw new NotFoundException();
-    await this.prisma.groupMember.createMany({
-      data: body.userIds.map((userId) => ({ groupId: id, userId })),
-      skipDuplicates: true,
-    });
-    return { ok: true };
+    return this.groups.setMembers(user, id, body.userIds ?? []);
+  }
+
+  @Post(':id/members')
+  @UseGuards(AdminGuard)
+  addMembers(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: { userIds: string[] },
+  ) {
+    return this.groups.addMembers(user, id, body.userIds ?? []);
   }
 
   @Delete(':id/members/:uid')
   @UseGuards(AdminGuard)
-  async removeMember(
+  removeMember(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Param('uid') uid: string,
   ) {
-    const group = await this.prisma.group.findFirst({
-      where: { id, tenantId: user.tenantId },
-    });
-    if (!group) throw new NotFoundException();
-    await this.prisma.groupMember.deleteMany({
-      where: { groupId: id, userId: uid },
-    });
-    return { ok: true };
+    return this.groups.removeMember(user, id, uid);
   }
 }

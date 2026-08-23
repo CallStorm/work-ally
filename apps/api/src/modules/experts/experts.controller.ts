@@ -35,7 +35,7 @@ export class ExpertsController {
     @Query('sort') sort?: string,
     @Query('all') all?: string,
   ) {
-    const isAdmin = user.role === 'owner' || user.role === 'admin';
+    const isAdmin = user.role === 'admin';
     const items = await this.prisma.expert.findMany({
       where: {
         tenantId: user.tenantId,

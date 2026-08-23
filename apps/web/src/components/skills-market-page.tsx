@@ -77,14 +77,6 @@ export default function SkillsMarketPage({
     await refresh();
   }
 
-  async function shareTenant(id: string) {
-    await apiFetch(`/resources/skills/${id}/acl`, {
-      method: 'PUT',
-      body: JSON.stringify({ visibility: 'tenant', entries: [] }),
-    });
-    await refresh();
-  }
-
   if (!ready || !auth) return <main style={{ padding: 24 }}>加载中…</main>;
 
   return (
@@ -178,12 +170,7 @@ export default function SkillsMarketPage({
               }}
             >
               {filtered.map((skill) => (
-                <SkillCard
-                  key={skill.id}
-                  skill={skill}
-                  adminMode={adminMode}
-                  onShare={() => void shareTenant(skill.id)}
-                />
+                <SkillCard key={skill.id} skill={skill} adminMode={adminMode} />
               ))}
             </div>
           )}
@@ -247,12 +234,10 @@ export default function SkillsMarketPage({
 
 function SkillCard({
   skill,
-  adminMode,
-  onShare,
+  adminMode: _adminMode,
 }: {
   skill: Skill;
   adminMode: boolean;
-  onShare: () => void;
 }) {
   return (
     <article
@@ -272,7 +257,7 @@ function SkillCard({
           <div>
             <div style={{ fontWeight: 700 }}>{skill.name}</div>
             <div style={{ color: 'var(--muted)', fontSize: 12 }}>
-              {skill.slug} · v{skill.version} · {skill.visibility}
+              {skill.slug} · v{skill.version} · 全公司
             </div>
           </div>
         </div>
@@ -291,11 +276,6 @@ function SkillCard({
       >
         {skill.descriptionShort}
       </p>
-      {adminMode && skill.visibility !== 'tenant' && (
-        <button type="button" onClick={onShare} style={ghostBtn}>
-          分享到全公司
-        </button>
-      )}
     </article>
   );
 }

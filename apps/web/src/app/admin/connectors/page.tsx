@@ -70,7 +70,7 @@ export default function AdminConnectorsPage() {
 
   useEffect(() => {
     if (!auth) return;
-    if (auth.user.role !== 'owner' && auth.user.role !== 'admin') {
+    if (auth.user.role !== 'admin') {
       router.replace('/workbench');
       return;
     }
@@ -367,7 +367,7 @@ export default function AdminConnectorsPage() {
                   >
                     <strong style={{ fontSize: 15 }}>{item.name}</strong>
                     <span style={chipStyle}>{item.transport}</span>
-                    <span style={chipStyle}>{item.visibility}</span>
+                    <span style={chipStyle}>全公司</span>
                     <HealthBadge status={item.healthStatus} />
                     {!active && (
                       <span

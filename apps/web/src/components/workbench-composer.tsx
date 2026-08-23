@@ -7,6 +7,7 @@ import ComposerAddons from '@/components/composer-addons';
 import ModelSelect from '@/components/model-select';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { useCurrentGroup } from '@/lib/group-context';
 
 type Expert = {
   id: string;
@@ -43,6 +44,7 @@ type DefaultAgent = {
 
 export default function WorkbenchComposer() {
   const { auth, ready } = useAuth();
+  const { currentGroupId } = useCurrentGroup();
   const router = useRouter();
   const search = useSearchParams();
   const preselectExpertId = search.get('expertId');
@@ -141,8 +143,8 @@ export default function WorkbenchComposer() {
   }
 
   async function send() {
-    if (!auth?.defaultGroupId) {
-      setError('缺少默认组，请重新登录/注册');
+    if (!currentGroupId) {
+      setError('请先选择工作组');
       return;
     }
     const text = content.trim();
@@ -160,7 +162,7 @@ export default function WorkbenchComposer() {
       }>('/sessions', {
         method: 'POST',
         body: JSON.stringify({
-          groupId: auth.defaultGroupId,
+          groupId: currentGroupId,
           expertId: selectedExpertId,
           modelConfigId,
           content: text,
@@ -282,7 +284,7 @@ export default function WorkbenchComposer() {
         {!loadingAssets && experts.length === 0 && (
           <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 12 }}>
             暂无可用专家。
-            {(auth.user.role === 'owner' || auth.user.role === 'admin') && (
+            {auth.user.role === 'admin' && (
               <>
                 去{' '}
                 <Link href="/admin/experts" style={{ color: 'var(--accent)' }}>
