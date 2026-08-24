@@ -4,7 +4,7 @@
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "pnpm --filter @work-ally/shared build && pnpm -r --parallel --filter @work-ally/shared --filter @work-ally/api --filter @work-ally/web dev",
-    "dev:api": "pnpm --filter @work-ally/api dev",
+    "dev:api": "node scripts/kill-api-port.mjs && pnpm --filter @work-ally/api dev",
     "dev:web": "pnpm --filter @work-ally/web dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",

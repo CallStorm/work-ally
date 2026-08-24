@@ -27,6 +27,10 @@ export class RuntimePathsService {
     return path.join(this.root(), 'runs', tenantId, runId);
   }
 
+  sessionWorkspaceDir(tenantId: string, sessionId: string) {
+    return path.join(this.root(), 'sessions', tenantId, sessionId);
+  }
+
   ensureDir(dir: string) {
     fs.mkdirSync(dir, { recursive: true });
     return dir;

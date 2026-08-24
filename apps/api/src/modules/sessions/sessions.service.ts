@@ -39,7 +39,21 @@ export class SessionsService {
       include: {
         messages: { orderBy: { createdAt: 'asc' } },
         expert: true,
-        runs: { orderBy: { createdAt: 'desc' }, take: 5 },
+        runs: {
+          orderBy: { createdAt: 'asc' },
+          include: {
+            events: {
+              orderBy: { seq: 'asc' },
+              select: {
+                id: true,
+                seq: true,
+                type: true,
+                ts: true,
+                data: true,
+              },
+            },
+          },
+        },
       },
     });
     if (!session) throw new NotFoundException('Session not found');
@@ -49,7 +63,27 @@ export class SessionsService {
     ) {
       throw new ForbiddenException();
     }
-    return session;
+    return {
+      ...session,
+      runs: session.runs.map((run) => ({
+        id: run.id,
+        state: run.state,
+        stepsCount: run.stepsCount,
+        messageId: run.messageId,
+        assistantMessageId: run.assistantMessageId,
+        createdAt: run.createdAt,
+        events: run.events.map((ev) => ({
+          type: ev.type,
+          runId: run.id,
+          sessionId: session.id,
+          ts: ev.ts.toISOString(),
+          data:
+            ev.data && typeof ev.data === 'object'
+              ? (ev.data as Record<string, unknown>)
+              : {},
+        })),
+      })),
+    };
   }
 
   async create(user: AuthUser, raw: CreateSessionInput) {

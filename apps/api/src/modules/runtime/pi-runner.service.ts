@@ -59,7 +59,7 @@ export class PiRunnerService {
     const piProviderId = llm?.piProviderId || 'minimax';
 
     const sandbox = this.paths.ensureDir(
-      this.paths.runSandboxDir(input.tenantId, input.runId),
+      this.paths.sessionWorkspaceDir(input.tenantId, input.sessionId),
     );
     const agentDir = this.paths.ensureDir(path.join(sandbox, '.pi-agent'));
     const modelsPath = path.join(agentDir, 'models.json');
@@ -161,6 +161,7 @@ export class PiRunnerService {
     let text = '';
     let stepsCount = 0;
     let thinkingText = '';
+    const toolArgsById = new Map<string, unknown>();
 
     const unsubscribe = session.subscribe((event) => {
       this.mapEvent(input.runId, input.sessionId, event, {
@@ -187,6 +188,7 @@ export class PiRunnerService {
             thinkingText = '';
           }
         },
+        toolArgsById,
       });
     });
 
@@ -283,6 +285,7 @@ export class PiRunnerService {
       onText: (d: string) => void;
       onThinking?: (d: string) => void;
       onStep: () => void;
+      toolArgsById: Map<string, unknown>;
     },
   ) {
     switch (event.type) {
@@ -300,16 +303,28 @@ export class PiRunnerService {
       }
       case 'tool_execution_start': {
         hooks.onStep();
+        const toolCallId = String(event.toolCallId ?? '');
+        const args = event.args ?? event.input ?? {};
+        if (toolCallId) hooks.toolArgsById.set(toolCallId, args);
         this.events.emit('tool_call', runId, sessionId, {
+          toolCallId,
           toolName: String(event.toolName ?? 'tool'),
-          input: event.args ?? event.input ?? {},
+          input: args,
         });
         break;
       }
       case 'tool_execution_end': {
+        const toolCallId = String(event.toolCallId ?? '');
+        const cachedArgs = toolCallId
+          ? hooks.toolArgsById.get(toolCallId)
+          : undefined;
+        if (toolCallId) hooks.toolArgsById.delete(toolCallId);
         this.events.emit('tool_result', runId, sessionId, {
+          toolCallId,
           toolName: String(event.toolName ?? 'tool'),
+          input: cachedArgs ?? event.args ?? event.input ?? {},
           output: event.result ?? event.output ?? {},
+          isError: Boolean(event.isError),
         });
         break;
       }

@@ -22,6 +22,11 @@ import { ModelsModule } from '../models/models.module';
     RuntimePathsService,
     McpBridgeService,
   ],
-  exports: [RuntimeService, RuntimeEventsService, McpBridgeService],
+  exports: [
+    RuntimeService,
+    RuntimeEventsService,
+    RuntimePathsService,
+    McpBridgeService,
+  ],
 })
 export class RuntimeModule {}

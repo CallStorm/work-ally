@@ -337,7 +337,7 @@ export default function ComposerAddons({
   };
 
   return (
-    <div ref={rootRef}>
+    <div ref={rootRef} style={{ width: '100%', minWidth: 0 }}>
       {selectedSkills.length > 0 && (
         <div
           style={{
@@ -601,9 +601,9 @@ export default function ComposerAddons({
                             style={{
                               width: '100%',
                               display: 'flex',
-                              alignItems: 'flex-start',
+                              alignItems: 'center',
                               gap: 10,
-                              padding: '10px 12px',
+                              padding: '8px 12px',
                               border: 'none',
                               background: on ? '#f1f5f9' : 'transparent',
                               cursor: 'pointer',
@@ -630,7 +630,10 @@ export default function ComposerAddons({
                                 style={{
                                   fontSize: 14,
                                   fontWeight: 600,
-                                  marginBottom: 2,
+                                  color: 'var(--ink)',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
                                 }}
                               >
                                 {skill.name}
@@ -640,8 +643,13 @@ export default function ComposerAddons({
                                   style={{
                                     fontSize: 12,
                                     color: 'var(--muted)',
-                                    lineHeight: 1.4,
+                                    lineHeight: 1.35,
+                                    marginTop: 2,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
                                   }}
+                                  title={skill.descriptionShort}
                                 >
                                   {skill.descriptionShort}
                                 </div>

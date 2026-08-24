@@ -1,26 +1,31 @@
 import type { RuntimeEvent } from '@/lib/types';
 
-export type RunTraceSubStep = {
+export type AgentStepStatus = 'running' | 'done' | 'error';
+
+export type ThinkingStep = {
   id: string;
-  label: string;
+  kind: 'thinking';
+  summary: string;
+  body: string;
+  status: AgentStepStatus;
+  ts: string;
+};
+
+export type ToolStep = {
+  id: string;
+  kind: 'tool';
   toolName: string;
+  label: string;
   input?: unknown;
   output?: unknown;
-  status: 'running' | 'done';
+  status: AgentStepStatus;
   ts: string;
 };
 
-export type RunTracePhase = {
-  id: string;
-  kind: 'prepare' | 'thinking';
-  title: string;
-  message?: string;
-  steps: RunTraceSubStep[];
-  ts: string;
-};
+export type AgentStep = ThinkingStep | ToolStep;
 
-export type RunTraceModel = {
-  phases: RunTracePhase[];
+export type RunTimeline = {
+  steps: AgentStep[];
   status: 'running' | 'done' | 'error';
   durationSec?: number;
 };
@@ -33,44 +38,56 @@ function shouldHideThinking(message: string) {
   return false;
 }
 
-function flushThinkingPhase(
-  phases: RunTracePhase[],
-  message: string,
-  ts: string,
-) {
-  const trimmed = message.trim();
-  if (!trimmed || shouldHideThinking(trimmed)) return;
-  phases.push({
-    id: `thinking-${ts}`,
-    kind: 'thinking',
-    title: '深度思考',
-    message: trimmed,
-    steps: [],
-    ts,
-  });
+/** One-line summary for thinking blocks (Claude Code style). */
+export function summarizeThinking(body: string): string {
+  const line =
+    body
+      .split(/\n/)
+      .map((l) => l.trim())
+      .find((l) => l.length > 0) ?? '';
+  if (!line) return '思考中';
+  return line.length > 72 ? `${line.slice(0, 72)}…` : line;
 }
 
-function ensureThinkingPhase(phases: RunTracePhase[], ts: string) {
-  const last = phases[phases.length - 1];
-  if (last?.kind === 'thinking') return last;
-  const phase: RunTracePhase = {
-    id: `thinking-${ts}`,
-    kind: 'thinking',
-    title: '深度思考',
-    steps: [],
-    ts,
-  };
-  phases.push(phase);
-  return phase;
-}
-
-export function buildRunTrace(events: RuntimeEvent[]): RunTraceModel {
-  const phases: RunTracePhase[] = [];
-  const pendingTools = new Map<string, { phaseIdx: number; stepIdx: number }>();
+export function buildRunTimeline(events: RuntimeEvent[]): RunTimeline {
+  const steps: AgentStep[] = [];
+  const pendingTools = new Map<string, number>();
   let startedAt: number | null = null;
   let finishedAt: number | null = null;
-  let status: RunTraceModel['status'] = 'running';
+  let status: RunTimeline['status'] = 'running';
   let pendingThinking = '';
+  let streamingThinkingId: string | null = null;
+
+  const pushThinking = (message: string, ts: string, done: boolean) => {
+    const trimmed = message.trim();
+    if (!trimmed || shouldHideThinking(trimmed)) return;
+
+    if (streamingThinkingId) {
+      const idx = steps.findIndex((s) => s.id === streamingThinkingId);
+      if (idx >= 0 && steps[idx].kind === 'thinking') {
+        steps[idx] = {
+          ...steps[idx],
+          body: trimmed,
+          summary: summarizeThinking(trimmed),
+          status: done ? 'done' : 'running',
+          ts,
+        };
+        if (done) streamingThinkingId = null;
+        return;
+      }
+    }
+
+    const id = `thinking-${ts}-${steps.length}`;
+    steps.push({
+      id,
+      kind: 'thinking',
+      summary: summarizeThinking(trimmed),
+      body: trimmed,
+      status: done ? 'done' : 'running',
+      ts,
+    });
+    streamingThinkingId = done ? null : id;
+  };
 
   for (const ev of events) {
     if (ev.type === 'run_started') {
@@ -89,105 +106,119 @@ export function buildRunTrace(events: RuntimeEvent[]): RunTraceModel {
       const streaming = Boolean(ev.data?.streaming);
       if (streaming) {
         pendingThinking = message;
+        pushThinking(message, ev.ts, false);
         continue;
       }
-      if (pendingThinking) {
-        flushThinkingPhase(phases, pendingThinking, ev.ts);
-        pendingThinking = '';
-      } else {
-        flushThinkingPhase(phases, message, ev.ts);
-      }
+      const finalMsg = pendingThinking || message;
+      pendingThinking = '';
+      pushThinking(finalMsg, ev.ts, true);
       continue;
     }
 
     if (ev.type === 'tool_call') {
       if (pendingThinking) {
-        flushThinkingPhase(phases, pendingThinking, ev.ts);
+        pushThinking(pendingThinking, ev.ts, true);
         pendingThinking = '';
       }
+      streamingThinkingId = null;
 
       const toolName = String(ev.data?.toolName ?? 'tool');
-      const isPrepareTool =
-        toolName.startsWith('mcp_') ||
-        toolName.includes('skill') ||
-        (!phases.length && toolName !== 'bash');
-
-      if (isPrepareTool && !phases.some((p) => p.kind === 'prepare')) {
-        const preparePhase: RunTracePhase = {
-          id: `prepare-${ev.ts}`,
-          kind: 'prepare',
-          title: `运行校验、处理：${formatToolLabel(toolName)}`,
-          steps: [],
-          ts: ev.ts,
-        };
-        phases.push(preparePhase);
-        const step: RunTraceSubStep = {
-          id: `tool-${ev.ts}-${toolName}`,
-          label: inferStepLabel(toolName, ev.data?.input),
-          toolName,
-          input: ev.data?.input,
-          status: 'running',
-          ts: ev.ts,
-        };
-        preparePhase.steps.push(step);
-        pendingTools.set(toolName, {
-          phaseIdx: phases.length - 1,
-          stepIdx: preparePhase.steps.length - 1,
-        });
-        continue;
-      }
-
-      const phase = ensureThinkingPhase(phases, ev.ts);
-      const step: RunTraceSubStep = {
-        id: `tool-${ev.ts}-${toolName}`,
-        label: inferStepLabel(toolName, ev.data?.input),
+      const toolCallId = String(ev.data?.toolCallId ?? '');
+      const pendingKey = toolCallId || `${toolName}-${steps.length}`;
+      const step: ToolStep = {
+        id: `tool-${ev.ts}-${pendingKey}`,
+        kind: 'tool',
         toolName,
+        label: inferStepLabel(toolName, ev.data?.input),
         input: ev.data?.input,
         status: 'running',
         ts: ev.ts,
       };
-      phase.steps.push(step);
-      pendingTools.set(toolName, {
-        phaseIdx: phases.length - 1,
-        stepIdx: phase.steps.length - 1,
-      });
+      pendingTools.set(pendingKey, steps.length);
+      if (toolCallId) pendingTools.set(toolCallId, steps.length);
+      steps.push(step);
       continue;
     }
 
     if (ev.type === 'tool_result') {
       const toolName = String(ev.data?.toolName ?? 'tool');
+      const toolCallId = String(ev.data?.toolCallId ?? '');
       const output = ev.data?.output;
-      const loc = pendingTools.get(toolName);
-      if (loc) {
-        const phase = phases[loc.phaseIdx];
-        const step = phase?.steps[loc.stepIdx];
-        if (step) {
-          phase.steps[loc.stepIdx] = { ...step, output, status: 'done' };
-          pendingTools.delete(toolName);
-          continue;
+      const input = ev.data?.input;
+      const isError = Boolean(ev.data?.isError);
+      const loc =
+        (toolCallId ? pendingTools.get(toolCallId) : undefined) ??
+        [...pendingTools.entries()].reverse().find(([k]) => k.startsWith(`${toolName}-`))?.[1];
+
+      // Prefer latest running step with same tool name
+      let idx = loc;
+      if (idx == null) {
+        for (let i = steps.length - 1; i >= 0; i -= 1) {
+          const s = steps[i];
+          if (s.kind === 'tool' && s.toolName === toolName && s.status === 'running') {
+            idx = i;
+            break;
+          }
         }
       }
-      const phase = ensureThinkingPhase(phases, ev.ts);
-      phase.steps.push({
+
+      if (idx != null && steps[idx]?.kind === 'tool') {
+        const prev = steps[idx] as ToolStep;
+        steps[idx] = {
+          ...prev,
+          input: prev.input ?? input,
+          output,
+          status: isError ? 'error' : 'done',
+          label: inferStepLabel(toolName, prev.input ?? input),
+        };
+        if (toolCallId) pendingTools.delete(toolCallId);
+        continue;
+      }
+
+      steps.push({
         id: `tool-result-${ev.ts}-${toolName}`,
-        label: inferStepLabel(toolName, undefined),
+        kind: 'tool',
         toolName,
+        label: inferStepLabel(toolName, input),
+        input,
         output,
-        status: 'done',
+        status: isError ? 'error' : 'done',
         ts: ev.ts,
       });
     }
   }
 
   if (pendingThinking) {
-    flushThinkingPhase(phases, pendingThinking, `pending-${Date.now()}`);
+    pushThinking(pendingThinking, `pending-${Date.now()}`, status !== 'running');
+  }
+
+  // Close any still-running thinking when run finished
+  if (status !== 'running') {
+    for (let i = 0; i < steps.length; i += 1) {
+      if (steps[i].status === 'running') {
+        steps[i] = { ...steps[i], status: status === 'error' ? 'error' : 'done' };
+      }
+    }
   }
 
   const end = finishedAt ?? (startedAt ? Date.now() : null);
   const durationSec =
-    startedAt && end ? Math.max(1, Math.round((end - startedAt) / 1000)) : undefined;
+    startedAt && end
+      ? Math.max(1, Math.round((end - startedAt) / 1000))
+      : undefined;
 
-  return { phases, status, durationSec };
+  return { steps, status, durationSec };
+}
+
+/** @deprecated use buildRunTimeline */
+export function buildRunTrace(events: RuntimeEvent[]) {
+  const timeline = buildRunTimeline(events);
+  return {
+    phases: [] as never[],
+    status: timeline.status,
+    durationSec: timeline.durationSec,
+    steps: timeline.steps,
+  };
 }
 
 export function formatToolLabel(toolName: string) {
@@ -199,6 +230,17 @@ export function formatToolLabel(toolName: string) {
     return toolName.replace(/^mcp_/, '');
   }
   return toolName;
+}
+
+export function toolKindBadge(toolName: string): string {
+  const n = toolName.toLowerCase();
+  if (n.startsWith('mcp_')) return 'MCP';
+  if (n === 'bash') return 'Bash';
+  if (n === 'read') return 'Read';
+  if (n === 'write') return 'Write';
+  if (n === 'edit') return 'Edit';
+  if (n.includes('skill')) return 'Skill';
+  return formatToolLabel(toolName);
 }
 
 export function inferStepLabel(toolName: string, input: unknown): string {
@@ -217,9 +259,25 @@ export function inferStepLabel(toolName: string, input: unknown): string {
     }
     if (command.trim()) {
       const first = command.trim().split('\n')[0] ?? command;
-      return first.length > 42 ? `${first.slice(0, 42)}…` : first;
+      return first.length > 56 ? `${first.slice(0, 56)}…` : first;
     }
     return '执行 bash 命令';
+  }
+
+  if (input && typeof input === 'object') {
+    const path = String(
+      (input as { path?: unknown; file_path?: unknown; filePath?: unknown }).path ??
+        (input as { file_path?: unknown }).file_path ??
+        (input as { filePath?: unknown }).filePath ??
+        '',
+    );
+    if (path) {
+      const base = path.split(/[/\\]/).pop() || path;
+      if (toolName === 'read') return `读取 ${base}`;
+      if (toolName === 'write') return `写入 ${base}`;
+      if (toolName === 'edit') return `编辑 ${base}`;
+      return `${formatToolLabel(toolName)} ${base}`;
+    }
   }
 
   if (toolName === 'read') return '读取文件';
@@ -245,6 +303,22 @@ function extractCityHint(command: string): string | null {
 export function stringifyTracePayload(value: unknown): string {
   if (value === undefined || value === null) return '';
   if (typeof value === 'string') return value;
+  // Pi tool results often nest text in content[]
+  if (typeof value === 'object' && value !== null && 'content' in value) {
+    const content = (value as { content: unknown }).content;
+    if (Array.isArray(content)) {
+      const texts = content
+        .map((part) => {
+          if (typeof part === 'string') return part;
+          if (part && typeof part === 'object' && 'text' in part) {
+            return String((part as { text: unknown }).text ?? '');
+          }
+          return '';
+        })
+        .filter(Boolean);
+      if (texts.length) return texts.join('\n');
+    }
+  }
   try {
     return JSON.stringify(value, null, 2);
   } catch {

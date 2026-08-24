@@ -260,17 +260,11 @@ export default function WorkbenchComposer() {
             }
           >
             <textarea
+              className="workbench-composer__input"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="今天帮你做些什么？"
-              style={{
-                flex: 1,
-                border: 'none',
-                resize: 'none',
-                outline: 'none',
-                font: 'inherit',
-                minHeight: 88,
-              }}
+              style={{ minHeight: 88 }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                   e.preventDefault();

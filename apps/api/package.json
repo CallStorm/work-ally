@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "nest start --watch",
+    "dev": "node ../../scripts/kill-api-port.mjs && nest start --watch",
     "build": "nest build",
     "start": "node dist/main.js",
     "lint": "tsc -p tsconfig.json --noEmit",

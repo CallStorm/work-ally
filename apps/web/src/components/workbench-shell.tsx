@@ -38,14 +38,7 @@ const navItems: NavItem[] = [
         (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
       ),
   },
-  {
-    href: '/workbench/knowledge',
-    label: '知识库',
-    icon: <NavIconKnowledge />,
-    active: (pathname) =>
-      pathname === '/workbench/knowledge' ||
-      pathname.startsWith('/workbench/knowledge/'),
-  },
+  // 知识库入口暂时隐藏，后续再开放
 ];
 
 export default function WorkbenchShell({
@@ -529,19 +522,6 @@ function NavIconAssets() {
       <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
       <path d="M9.5 10.5c.6-1.2 1.6-1.8 2.5-1.8s1.9.6 2.5 1.8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       <path d="M8.5 14.2c1-1.1 2.2-1.7 3.5-1.7s2.5.6 3.5 1.7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function NavIconKnowledge() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M6 5.5h12v13H6a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-      <path d="M8 5.5V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1.5" stroke="currentColor" strokeWidth="1.6" />
     </svg>
   );
 }

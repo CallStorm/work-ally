@@ -57,6 +57,51 @@ export class ApiError extends Error {
   }
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isIdempotentRequest(method: string) {
+  const normalized = method.toUpperCase();
+  return normalized === 'GET' || normalized === 'HEAD';
+}
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+): Promise<Response> {
+  const method = init.method ?? 'GET';
+  const maxAttempts = isIdempotentRequest(method) ? 3 : 1;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (
+        isIdempotentRequest(method) &&
+        (res.status === 502 || res.status === 503) &&
+        attempt < maxAttempts - 1
+      ) {
+        await sleep(350 * (attempt + 1));
+        continue;
+      }
+      return res;
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts - 1) {
+        await sleep(350 * (attempt + 1));
+        continue;
+      }
+    }
+  }
+
+  if (lastError) throw lastError;
+  throw new ApiError(
+    '无法连接 API（Failed to fetch）。请确认 pnpm dev 中 API 已启动，并刷新页面。',
+    0,
+  );
+}
+
 export async function apiFetch<T>(
   path: string,
   init: RequestInit = {},
@@ -72,7 +117,7 @@ export async function apiFetch<T>(
 
   let res: Response;
   try {
-    res = await fetch(`${getApiBase()}${path}`, {
+    res = await fetchWithRetry(`${getApiBase()}${path}`, {
       ...init,
       headers,
     });

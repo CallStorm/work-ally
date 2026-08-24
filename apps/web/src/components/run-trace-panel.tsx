@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  buildRunTrace,
-  formatToolLabel,
+  buildRunTimeline,
   stringifyTracePayload,
-  type RunTracePhase,
-  type RunTraceSubStep,
+  toolKindBadge,
+  type AgentStep,
+  type ToolStep,
 } from '@/lib/run-trace';
 import type { RuntimeEvent } from '@/lib/types';
 
@@ -17,337 +17,296 @@ export default function RunTracePanel({
   events: RuntimeEvent[];
   running?: boolean;
 }) {
-  const trace = useMemo(() => buildRunTrace(events), [events]);
-  const [expanded, setExpanded] = useState(Boolean(running));
+  const timeline = useMemo(() => buildRunTimeline(events), [events]);
+  const [expandAll, setExpandAll] = useState(false);
 
-  useEffect(() => {
-    if (running) setExpanded(true);
-    if (!running && trace.status === 'done') setExpanded(false);
-  }, [running, trace.status]);
+  if (timeline.steps.length === 0 && !running) return null;
 
-  if (trace.phases.length === 0 && !running) return null;
-
-  const toolCount = trace.phases.reduce((n, p) => n + p.steps.length, 0);
   const summary = running
-    ? '执行中…'
-    : trace.status === 'error'
+    ? '执行中'
+    : timeline.status === 'error'
       ? '执行失败'
-      : `已完成${trace.durationSec ? ` · ${trace.durationSec}s` : ''}`;
+      : '已完成';
 
   return (
-    <div style={{ marginBottom: 12 }}>
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
+    <div style={{ marginBottom: 16 }}>
+      <div
         style={{
-          border: 'none',
-          background: 'transparent',
-          padding: '2px 0',
-          display: 'inline-flex',
+          display: 'flex',
           alignItems: 'center',
           gap: 8,
-          cursor: 'pointer',
-          fontSize: 13,
+          marginBottom: 8,
+          fontSize: 12,
           color: '#64748b',
         }}
       >
-        {running && (
-          <span
+        {running ? <PulseDot /> : <CheckDot ok={timeline.status !== 'error'} />}
+        <span style={{ fontWeight: 600, color: '#475569' }}>{summary}</span>
+        {timeline.steps.length > 0 && (
+          <span>{timeline.steps.length} 步</span>
+        )}
+        {timeline.durationSec != null && !running && (
+          <span>· {timeline.durationSec}s</span>
+        )}
+        {timeline.steps.length > 2 && (
+          <button
+            type="button"
+            onClick={() => setExpandAll((v) => !v)}
             style={{
-              width: 8,
-              height: 8,
-              borderRadius: 999,
-              background: '#3b82f6',
-              display: 'inline-block',
+              marginLeft: 'auto',
+              border: 'none',
+              background: 'transparent',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              fontSize: 12,
+              padding: 0,
             }}
-          />
+          >
+            {expandAll ? '全部收起' : '全部展开'}
+          </button>
         )}
-        <span style={{ fontWeight: 600, color: '#334155' }}>{summary}</span>
-        {toolCount > 0 && (
-          <span style={{ color: '#94a3b8' }}>{toolCount} 次工具调用</span>
-        )}
-        <span style={{ color: '#94a3b8' }}>{expanded ? '▾' : '▸'}</span>
-      </button>
+      </div>
 
-      {expanded && (
-        <div
-          style={{
-            marginTop: 10,
-            display: 'grid',
-            gap: 10,
-            paddingLeft: 2,
-          }}
-        >
-          {trace.phases.length === 0 && running && (
-            <div style={{ fontSize: 13, color: '#94a3b8' }}>正在准备…</div>
-          )}
-          {trace.phases.map((phase) => (
-            <TracePhase key={phase.id} phase={phase} running={running} />
-          ))}
-        </div>
-      )}
+      <div
+        style={{
+          display: 'grid',
+          gap: 0,
+          borderLeft: '1px solid #e8edf2',
+          marginLeft: 5,
+          paddingLeft: 14,
+        }}
+      >
+        {timeline.steps.length === 0 && running && (
+          <div style={{ fontSize: 13, color: '#94a3b8', padding: '4px 0' }}>
+            正在准备…
+          </div>
+        )}
+        {timeline.steps.map((step, i) => (
+          <TimelineStepRow
+            key={step.id}
+            step={step}
+            forceOpen={expandAll}
+            autoOpen={
+              Boolean(running) &&
+              i === timeline.steps.length - 1 &&
+              step.status === 'running'
+            }
+          />
+        ))}
+      </div>
     </div>
   );
 }
 
-function TracePhase({
-  phase,
-  running,
+function TimelineStepRow({
+  step,
+  forceOpen,
+  autoOpen,
 }: {
-  phase: RunTracePhase;
-  running?: boolean;
+  step: AgentStep;
+  forceOpen: boolean;
+  autoOpen: boolean;
 }) {
-  const [open, setOpen] = useState(
-    phase.kind === 'thinking' ? Boolean(running) : false,
-  );
+  const [open, setOpen] = useState(autoOpen);
+  const userToggled = useRef(false);
 
   useEffect(() => {
-    if (running && phase.kind === 'thinking') setOpen(true);
-    if (!running && phase.kind === 'thinking') setOpen(false);
-  }, [running, phase.kind]);
+    if (forceOpen) {
+      setOpen(true);
+      return;
+    }
+    if (userToggled.current) return;
+    if (autoOpen) setOpen(true);
+    else if (!autoOpen && step.status !== 'running') setOpen(false);
+  }, [forceOpen, autoOpen, step.status]);
 
-  if (phase.kind === 'prepare') {
-    return (
-      <CollapsibleRow
-        icon="compass"
-        title={phase.title}
-        open={open}
-        onToggle={() => setOpen((v) => !v)}
-      >
-        {phase.steps.length > 0 && (
-          <div style={{ display: 'grid', gap: 6, marginTop: 8 }}>
-            {phase.steps.map((step) => (
-              <TraceSubStep key={step.id} step={step} />
-            ))}
-          </div>
-        )}
-      </CollapsibleRow>
-    );
-  }
+  const hasDetail =
+    step.kind === 'thinking'
+      ? step.body.trim().length > 0
+      : Boolean(
+          formatToolPayload(step.toolName, step.input, 'input') ||
+            formatToolPayload(step.toolName, step.output, 'output'),
+        );
+
+  const badge = step.kind === 'thinking' ? 'Thinking' : toolKindBadge(step.toolName);
+  const title = step.kind === 'thinking' ? step.summary : step.label;
 
   return (
-    <div style={{ display: 'grid', gap: 8 }}>
-      <CollapsibleRow
-        icon="thinking"
-        title="深度思考"
-        open={open}
-        onToggle={() => setOpen((v) => !v)}
-      >
-        {phase.message && (
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 13,
-              lineHeight: 1.65,
-              color: '#64748b',
-              borderLeft: '2px solid #e2e8f0',
-              paddingLeft: 12,
-              whiteSpace: 'pre-wrap',
-            }}
-          >
-            {phase.message}
-          </div>
-        )}
-        {phase.steps.length > 0 && (
-          <div
-            style={{
-              display: 'grid',
-              gap: 6,
-              marginTop: phase.message ? 10 : 8,
-            }}
-          >
-            {phase.steps.map((step) => (
-              <TraceSubStep key={step.id} step={step} />
-            ))}
-          </div>
-        )}
-      </CollapsibleRow>
-    </div>
-  );
-}
+    <div style={{ padding: '3px 0 6px', position: 'relative' }}>
+      <span
+        style={{
+          position: 'absolute',
+          left: -18,
+          top: 10,
+          width: 7,
+          height: 7,
+          borderRadius: 999,
+          background:
+            step.status === 'running'
+              ? '#3b82f6'
+              : step.status === 'error'
+                ? '#ef4444'
+                : '#94a3b8',
+          boxShadow:
+            step.status === 'running'
+              ? '0 0 0 3px rgba(59,130,246,0.18)'
+              : 'none',
+        }}
+      />
 
-function TraceSubStep({ step }: { step: RunTraceSubStep }) {
-  const [open, setOpen] = useState(false);
-  const inputBlock = formatToolPayload(step.toolName, step.input, 'input');
-  const outputBlock = formatToolPayload(step.toolName, step.output, 'output');
-  const hasDetail = Boolean(inputBlock || outputBlock);
-
-  return (
-    <div>
       <button
         type="button"
-        onClick={() => hasDetail && setOpen((v) => !v)}
+        onClick={() => {
+          if (!hasDetail) return;
+          userToggled.current = true;
+          setOpen((v) => !v);
+        }}
         style={{
           width: '100%',
           border: 'none',
-          background: 'transparent',
-          padding: '4px 0',
+          background: open ? '#f8fafc' : 'transparent',
+          borderRadius: 8,
+          padding: '5px 8px',
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'space-between',
+          gap: 8,
           cursor: hasDetail ? 'pointer' : 'default',
           textAlign: 'left',
         }}
       >
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <StepIcon />
-          <span style={{ fontSize: 13, color: '#475569' }}>{step.label}</span>
-          {step.status === 'running' && (
-            <span style={{ fontSize: 12, color: '#3b82f6' }}>运行中</span>
-          )}
+        <span
+          style={{
+            flexShrink: 0,
+            fontSize: 11,
+            fontWeight: 650,
+            color: step.kind === 'thinking' ? '#7c6fad' : '#0f6e56',
+            background: step.kind === 'thinking' ? '#f3f0fa' : '#e8f6f0',
+            borderRadius: 6,
+            padding: '2px 7px',
+            minWidth: 64,
+            textAlign: 'center',
+          }}
+        >
+          {badge}
         </span>
+        <span
+          style={{
+            flex: 1,
+            fontSize: 13,
+            color: '#334155',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily:
+              step.kind === 'tool' && step.toolName === 'bash'
+                ? 'ui-monospace, SFMono-Regular, Menlo, monospace'
+                : 'inherit',
+          }}
+        >
+          {title}
+        </span>
+        {step.status === 'running' && (
+          <span style={{ fontSize: 11, color: '#3b82f6', flexShrink: 0 }}>
+            …
+          </span>
+        )}
         {hasDetail && (
-          <span style={{ color: '#94a3b8', fontSize: 12 }}>{open ? '▾' : '▸'}</span>
+          <span
+            style={{
+              color: '#94a3b8',
+              fontSize: 11,
+              transform: open ? 'rotate(0deg)' : 'rotate(-90deg)',
+              transition: 'transform 0.12s ease',
+              flexShrink: 0,
+            }}
+          >
+            ▾
+          </span>
         )}
       </button>
 
       {open && hasDetail && (
-        <div
-          style={{
-            marginTop: 6,
-            marginLeft: 22,
-            display: 'grid',
-            gap: 8,
-          }}
-        >
-          {inputBlock && (
-            <PayloadBlock title={inputBlock.title} text={inputBlock.text} />
+        <div style={{ marginTop: 4, marginLeft: 4 }}>
+          {step.kind === 'thinking' ? (
+            <ScrollBody text={step.body} live={step.status === 'running'} />
+          ) : (
+            <ToolDetail step={step} />
           )}
-          {outputBlock && (
-            <PayloadBlock title={outputBlock.title} text={outputBlock.text} />
-          )}
-        </div>
-      )}
-
-      {step.toolName !== 'bash' && (
-        <div
-          style={{
-            marginLeft: 22,
-            fontSize: 12,
-            color: '#94a3b8',
-          }}
-        >
-          {formatToolLabel(step.toolName)}
         </div>
       )}
     </div>
   );
 }
 
-function CollapsibleRow({
-  icon,
+function ToolDetail({ step }: { step: ToolStep }) {
+  const inputBlock = formatToolPayload(step.toolName, step.input, 'input');
+  const outputBlock = formatToolPayload(step.toolName, step.output, 'output');
+  return (
+    <div style={{ display: 'grid', gap: 6 }}>
+      {inputBlock && (
+        <PayloadBlock title={inputBlock.title} text={inputBlock.text} dark={inputBlock.dark} />
+      )}
+      {outputBlock && (
+        <PayloadBlock title={outputBlock.title} text={outputBlock.text} dark={outputBlock.dark} />
+      )}
+    </div>
+  );
+}
+
+function ScrollBody({ text, live }: { text: string; live?: boolean }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!live || !ref.current) return;
+    ref.current.scrollTop = ref.current.scrollHeight;
+  }, [text, live]);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        fontSize: 12.5,
+        lineHeight: 1.6,
+        color: '#64748b',
+        background: '#fafbfc',
+        border: '1px solid #eef2f6',
+        borderRadius: 8,
+        padding: '8px 10px',
+        whiteSpace: 'pre-wrap',
+        maxHeight: 200,
+        overflowY: 'auto',
+        overscrollBehavior: 'contain',
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function PayloadBlock({
   title,
-  open,
-  onToggle,
-  children,
+  text,
+  dark,
 }: {
-  icon: 'compass' | 'thinking' | 'tool';
   title: string;
-  open: boolean;
-  onToggle: () => void;
-  children?: ReactNode;
+  text: string;
+  dark?: boolean;
 }) {
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={onToggle}
-        style={{
-          width: '100%',
-          border: 'none',
-          background: 'transparent',
-          padding: '2px 0',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          cursor: 'pointer',
-          textAlign: 'left',
-        }}
-      >
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          {icon === 'compass' && <CompassIcon />}
-          {icon === 'thinking' && (
-            <span style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600 }}>
-              {title}
-            </span>
-          )}
-          {icon === 'tool' && <span style={{ fontSize: 14 }}>🔧</span>}
-          {icon !== 'thinking' && (
-            <span style={{ fontSize: 13, color: '#475569' }}>{title}</span>
-          )}
-        </span>
-        <span style={{ color: '#94a3b8', fontSize: 12 }}>{open ? '▾' : '▸'}</span>
-      </button>
-      {open && children}
-    </div>
-  );
-}
-
-function StepIcon() {
-  return (
-    <span
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: 999,
-        border: '1.5px solid #cbd5e1',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        flexShrink: 0,
-      }}
-    >
-      <span
-        style={{
-          width: 6,
-          height: 1.5,
-          background: '#94a3b8',
-          display: 'block',
-        }}
-      />
-    </span>
-  );
-}
-
-function CompassIcon() {
-  return (
-    <span
-      style={{
-        width: 14,
-        height: 14,
-        borderRadius: 999,
-        border: '1.5px solid #cbd5e1',
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 9,
-        color: '#94a3b8',
-        flexShrink: 0,
-      }}
-    >
-      ◎
-    </span>
-  );
-}
-
-function PayloadBlock({ title, text }: { title: string; text: string }) {
-  const isBash = title === 'bash';
   return (
     <div
       style={{
-        borderRadius: 10,
+        borderRadius: 8,
         overflow: 'hidden',
-        border: isBash ? 'none' : '1px solid #eef2f6',
-        background: isBash ? '#0f172a' : '#f8fafc',
+        border: dark ? 'none' : '1px solid #eef2f6',
+        background: dark ? '#0f172a' : '#fafbfc',
       }}
     >
       <div
         style={{
-          padding: '6px 10px',
+          padding: '4px 10px',
           fontSize: 11,
           fontWeight: 600,
-          color: isBash ? '#94a3b8' : '#64748b',
-          borderBottom: isBash ? '1px solid #1e293b' : '1px solid #eef2f6',
+          color: dark ? '#94a3b8' : '#64748b',
+          borderBottom: dark ? '1px solid #1e293b' : '1px solid #eef2f6',
         }}
       >
         {title}
@@ -355,12 +314,12 @@ function PayloadBlock({ title, text }: { title: string; text: string }) {
       <pre
         style={{
           margin: 0,
-          padding: '10px 12px',
-          color: isBash ? '#e2e8f0' : '#334155',
+          padding: '8px 10px',
+          color: dark ? '#e2e8f0' : '#334155',
           fontSize: 12,
           lineHeight: 1.5,
           overflow: 'auto',
-          maxHeight: 260,
+          maxHeight: 180,
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
           fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -376,16 +335,71 @@ function formatToolPayload(
   toolName: string,
   value: unknown,
   kind: 'input' | 'output',
-): { title: string; text: string } | null {
-  const text = stringifyTracePayload(value);
-  if (!text) return null;
-
+): { title: string; text: string; dark?: boolean } | null {
   if (kind === 'input' && toolName === 'bash' && value && typeof value === 'object') {
     const command = (value as { command?: unknown }).command;
     if (typeof command === 'string' && command.trim()) {
-      return { title: 'bash', text: command };
+      return { title: 'command', text: command, dark: true };
     }
   }
 
-  return { title: kind === 'input' ? '输入' : '输出', text };
+  if (
+    kind === 'input' &&
+    value &&
+    typeof value === 'object' &&
+    'path' in (value as object)
+  ) {
+    const obj = value as Record<string, unknown>;
+    const path = String(obj.path ?? '');
+    if (toolName === 'write' && typeof obj.content === 'string') {
+      const content = obj.content as string;
+      const preview =
+        content.length > 2000 ? `${content.slice(0, 2000)}…` : content;
+      return {
+        title: path || 'input',
+        text: preview,
+      };
+    }
+    if (path && (toolName === 'read' || toolName === 'edit')) {
+      const text = stringifyTracePayload(value);
+      if (!text) return { title: 'path', text: path };
+    }
+  }
+
+  const text = stringifyTracePayload(value);
+  if (!text) return null;
+  return {
+    title: kind === 'input' ? 'input' : 'output',
+    text: text.length > 8000 ? `${text.slice(0, 8000)}…` : text,
+    dark: toolName === 'bash' && kind === 'output',
+  };
+}
+
+function PulseDot() {
+  return (
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 999,
+        background: '#3b82f6',
+        display: 'inline-block',
+        boxShadow: '0 0 0 3px rgba(59,130,246,0.2)',
+      }}
+    />
+  );
+}
+
+function CheckDot({ ok }: { ok: boolean }) {
+  return (
+    <span
+      style={{
+        width: 8,
+        height: 8,
+        borderRadius: 999,
+        background: ok ? '#10b981' : '#ef4444',
+        display: 'inline-block',
+      }}
+    />
+  );
 }

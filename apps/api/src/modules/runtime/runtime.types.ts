@@ -7,7 +7,10 @@ export type RuntimeEventType =
   | 'message_delta'
   | 'message_done'
   | 'error'
-  | 'run_finished';
+  | 'run_finished'
+  | 'artifact_created'
+  | 'artifact_updated'
+  | 'workspace_file_changed';
 
 export type RuntimeEvent = {
   type: RuntimeEventType;

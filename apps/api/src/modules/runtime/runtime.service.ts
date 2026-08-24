@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RuntimeEventsService } from './runtime-events.service';
@@ -28,7 +24,6 @@ export class RuntimeService {
     if (forced === 'mock' || forced === 'mastra' || forced === 'pi') {
       return forced;
     }
-    // Prefer Pi; credentials usually come from tenant LlmProvider, not only env.
     return 'pi';
   }
 
@@ -123,6 +118,7 @@ export class RuntimeService {
         data: {
           state: 'succeeded',
           stepsCount: result.stepsCount,
+          assistantMessageId: assistant.id,
         },
       });
 
@@ -159,6 +155,7 @@ export class RuntimeService {
       include: {
         toolCalls: true,
         knowledgeHits: true,
+        events: { orderBy: { seq: 'asc' } },
       },
     });
     if (!run) throw new NotFoundException('Run not found');

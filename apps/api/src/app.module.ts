@@ -17,6 +17,7 @@ import { DefaultAgentModule } from './modules/default-agent/default-agent.module
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { RuntimeModule } from './modules/runtime/runtime.module';
+import { WorkspaceModule } from './modules/workspace/workspace.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { RuntimeModule } from './modules/runtime/runtime.module';
     SessionsModule,
     AttachmentsModule,
     RuntimeModule,
+    WorkspaceModule,
   ],
   controllers: [HealthController],
 })

@@ -72,6 +72,10 @@ enum HealthStatus {
   error
 }
 
+enum ArtifactSource {
+  auto
+}
+
 model Tenant {
   id        String   @id @default(cuid())
   name      String
@@ -368,6 +372,7 @@ model Session {
   modelConfig ModelConfig? @relation(fields: [modelConfigId], references: [id], onDelete: SetNull)
   messages    Message[]
   runs        AgentRun[]
+  artifacts   SessionArtifact[]
 
   @@index([tenantId, groupId, createdBy])
   @@map("sessions")
@@ -421,9 +426,48 @@ model AgentRun {
   message       Message         @relation(fields: [messageId], references: [id], onDelete: Cascade)
   toolCalls     ToolCall[]
   knowledgeHits KnowledgeHit[]
+  artifacts     SessionArtifact[]
+  events        AgentRunEvent[]
+  assistantMessageId String?    @map("assistant_message_id")
 
   @@index([sessionId, createdAt])
   @@map("agent_runs")
+}
+
+model AgentRunEvent {
+  id        String   @id @default(cuid())
+  runId     String   @map("run_id")
+  seq       Int
+  type      String
+  ts        DateTime
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, seq])
+  @@index([runId, seq])
+  @@map("agent_run_events")
+}
+
+model SessionArtifact {
+  id        String         @id @default(cuid())
+  sessionId String         @map("session_id")
+  runId     String         @map("run_id")
+  path      String
+  filename  String
+  mimeType  String?        @map("mime_type")
+  sizeBytes Int            @default(0) @map("size_bytes")
+  source    ArtifactSource @default(auto)
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  session Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  run     AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, path])
+  @@index([sessionId, createdAt])
+  @@map("session_artifacts")
 }
 
 model ToolCall {
