@@ -306,6 +306,8 @@ export default function ComposerAddons({
         ? skillIds.filter((x) => x !== id)
         : [...skillIds, id],
     );
+    setMenuOpen(false);
+    setActiveMenu(null);
   }
 
   function toggleConnector(id: string) {
