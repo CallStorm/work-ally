@@ -136,6 +136,25 @@ export default function TaskDetailDrawer({
   }, []);
 
   useEffect(() => {
+    if (!task) return;
+    setTitle(task.title);
+    setCompleted(task.completed);
+    setDate(formatYmd(new Date(task.dueAt)));
+    setAllDay(task.allDay);
+    setTime(task.allDay ? '09:00' : localTimeValue(task.dueAt));
+    setPriority(task.priority);
+    setReminder(toDatetimeLocalValue(task.reminderAt));
+    setNotes(task.notes);
+  }, [
+    task?.id,
+    task?.completed,
+    task?.title,
+    task?.dueAt,
+    task?.updatedAt,
+    task?.allDay,
+  ]);
+
+  useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         e.preventDefault();

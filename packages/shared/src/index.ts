@@ -126,7 +126,7 @@ export const TaskPrioritySchema = z.enum(['high', 'medium', 'low']);
 export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
 
 export const CreateTaskSchema = z.object({
-  title: z.string().min(1).max(200),
+  title: z.string().trim().min(1).max(191),
   notes: z.string().max(50000).optional().default(''),
   priority: TaskPrioritySchema.optional().default('medium'),
   dueAt: z.string().datetime().optional(),
@@ -137,7 +137,7 @@ export const CreateTaskSchema = z.object({
 export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
 
 export const UpdateTaskSchema = z.object({
-  title: z.string().min(1).max(200).optional(),
+  title: z.string().trim().min(1).max(191).optional(),
   notes: z.string().max(50000).optional(),
   completed: z.boolean().optional(),
   priority: TaskPrioritySchema.optional(),

@@ -54,6 +54,12 @@ export function sameLocalDay(a: Date, b: Date): boolean {
   return formatYmd(a) === formatYmd(b);
 }
 
+/** Inclusive `from`, exclusive `to` (same convention as `rangeForView`). */
+export function isDateInRange(day: Date, from: Date, to: Date): boolean {
+  const t = startOfLocalDay(day).getTime();
+  return t >= from.getTime() && t < to.getTime();
+}
+
 export function rangeForView(
   view: CalendarView,
   anchor: Date,

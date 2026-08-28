@@ -1493,6 +1493,15 @@ a {
   padding: 48px 16px;
 }
 
+.stickies-app__error {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
 .stickies-cal {
   position: relative;
   z-index: 1;
@@ -1739,6 +1748,10 @@ a {
   margin: 0;
   flex-shrink: 0;
   cursor: pointer;
+}
+
+body.is-dragging-task .task-chip {
+  pointer-events: none;
 }
 
 .stickies-drawer__overlay {

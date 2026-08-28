@@ -26,10 +26,12 @@ export default function TaskChip({
   task,
   onOpen,
   onToggleComplete,
+  onDrop,
 }: {
   task: Task;
   onOpen: () => void;
   onToggleComplete: () => void;
+  onDrop?: (e: DragEvent) => void;
 }) {
   const didDragRef = useRef(false);
 
@@ -42,12 +44,22 @@ export default function TaskChip({
       onDragStart={(e) => {
         didDragRef.current = true;
         e.stopPropagation();
+        document.body.classList.add('is-dragging-task');
         setTaskDragData(e.dataTransfer, task.id);
       }}
       onDragEnd={() => {
+        document.body.classList.remove('is-dragging-task');
         requestAnimationFrame(() => {
           didDragRef.current = false;
         });
+      }}
+      onDragOver={(e) => {
+        if (!onDrop) return;
+        allowTaskDrop(e);
+      }}
+      onDrop={(e) => {
+        if (!onDrop) return;
+        onDrop(e);
       }}
       onClick={(e) => {
         e.stopPropagation();

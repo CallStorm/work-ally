@@ -9,6 +9,7 @@ import WeekView from './week-view';
 import {
   addDays,
   formatYmd,
+  isDateInRange,
   moveTaskToDay,
   moveTaskToSlot,
   rangeForView,
@@ -72,19 +73,36 @@ export default function StickiesApp() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [notifications, setNotifications] = useState<TaskNotification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [bellOpen, setBellOpen] = useState(false);
   const notifiedRef = useRef<Set<string>>(new Set());
   const bellRef = useRef<HTMLDivElement>(null);
+  const fetchIdRef = useRef(0);
+  const loadedRangeRef = useRef<string | null>(null);
 
   const loadTasks = useCallback(async () => {
     const { from, to } = rangeForView(view, anchorDate);
+    const rangeKey = `${from.toISOString()}|${to.toISOString()}`;
+    const rangeChanged = loadedRangeRef.current !== rangeKey;
+    const requestId = ++fetchIdRef.current;
+    if (rangeChanged) setLoading(true);
+    setLoadError(null);
     const params = new URLSearchParams({
       from: from.toISOString(),
       to: to.toISOString(),
       includeCompleted: hideCompleted ? 'false' : 'true',
     });
-    const data = await apiFetch<Task[]>(`/apps/stickies/tasks?${params}`);
-    setTasks(data);
+    try {
+      const data = await apiFetch<Task[]>(`/apps/stickies/tasks?${params}`);
+      if (requestId !== fetchIdRef.current) return;
+      setTasks(data);
+      loadedRangeRef.current = rangeKey;
+    } catch (err) {
+      if (requestId !== fetchIdRef.current) return;
+      setLoadError(err instanceof Error ? err.message : '加载任务失败');
+    } finally {
+      if (requestId === fetchIdRef.current) setLoading(false);
+    }
   }, [view, anchorDate, hideCompleted]);
 
   const loadNotifications = useCallback(async () => {
@@ -105,16 +123,7 @@ export default function StickiesApp() {
   }, []);
 
   useEffect(() => {
-    void (async () => {
-      setLoading(true);
-      try {
-        await loadTasks();
-      } catch {
-        setTasks([]);
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void loadTasks();
   }, [loadTasks]);
 
   useEffect(() => {
@@ -181,14 +190,16 @@ export default function StickiesApp() {
   function handleSelectDate(day: Date) {
     const localDay = startOfLocalDay(day);
     setSelectedDate(localDay);
-    setAnchorDate(localDay);
+    const { from, to } = rangeForView(view, anchorDate);
+    if (!isDateInRange(localDay, from, to)) {
+      setAnchorDate(localDay);
+    }
   }
 
   function handleViewChange(next: CalendarView) {
+    if (next === view) return;
     setView(next);
-    if (next === 'day' || next === 'week') {
-      setAnchorDate(startOfLocalDay(selectedDate));
-    }
+    setAnchorDate(startOfLocalDay(selectedDate));
   }
 
   function handleShiftRange(dir: number) {
@@ -303,7 +314,24 @@ export default function StickiesApp() {
     });
     setNotifications((prev) => prev.filter((x) => x.id !== n.id));
     setBellOpen(false);
-    setSelectedTaskId(n.taskId);
+
+    let task = tasks.find((t) => t.id === n.taskId) ?? null;
+    if (!task) {
+      try {
+        task = await apiFetch<Task>(`/apps/stickies/tasks/${n.taskId}`);
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : '无法打开该任务');
+        return;
+      }
+    }
+    const opened = task;
+    const dueDay = startOfLocalDay(new Date(opened.dueAt));
+    setTasks((prev) =>
+      prev.some((t) => t.id === opened.id) ? prev : [...prev, opened],
+    );
+    setSelectedDate(dueDay);
+    setAnchorDate(dueDay);
+    setSelectedTaskId(opened.id);
   }
 
   async function markAllNotificationsRead() {
@@ -435,6 +463,11 @@ export default function StickiesApp() {
       </header>
 
       <div className="stickies-cal">
+        {loadError && (
+          <div className="stickies-app__error" role="alert">
+            {loadError}
+          </div>
+        )}
         {loading ? (
           <div className="stickies-app__empty">加载中…</div>
         ) : view === 'month' ? (

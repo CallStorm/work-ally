@@ -3,6 +3,7 @@
 import TaskChip, { allowTaskDrop, getTaskDragId } from './task-chip';
 import { formatYmd, sameLocalDay, tasksOnLocalDay } from './date-utils';
 import type { Task } from './types';
+import type { DragEvent } from 'react';
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 export const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -41,6 +42,13 @@ export default function TimeGrid({
     onlyDay !== null &&
     sameLocalDay(onlyDay, today) &&
     tasksOnLocalDay(tasks, onlyDay).length === 0;
+
+  function dropOnSlot(e: DragEvent, day: Date, hour: number) {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = getTaskDragId(e.dataTransfer);
+    if (id) onDropTaskOnSlot(id, day, hour);
+  }
 
   return (
     <div className="stickies-timegrid">
@@ -127,12 +135,7 @@ export default function TimeGrid({
                       if (isEmpty) onCreateAt(day, hour);
                     }}
                     onDragOver={allowTaskDrop}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      const id = getTaskDragId(e.dataTransfer);
-                      if (id) onDropTaskOnSlot(id, day, hour);
-                    }}
+                    onDrop={(e) => dropOnSlot(e, day, hour)}
                     onKeyDown={(e) => {
                       if (!isEmpty) return;
                       if (e.key === 'Enter' || e.key === ' ') {
@@ -147,6 +150,7 @@ export default function TimeGrid({
                         task={task}
                         onOpen={() => onOpenTask(task.id)}
                         onToggleComplete={() => onToggleComplete(task)}
+                        onDrop={(e) => dropOnSlot(e, day, hour)}
                       />
                     ))}
                   </div>

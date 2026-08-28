@@ -9,6 +9,7 @@ import {
   tasksOnLocalDay,
 } from './date-utils';
 import type { Task } from './types';
+import type { DragEvent } from 'react';
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 const MAX_VISIBLE = 3;
@@ -34,6 +35,13 @@ export default function MonthView({
   const days = Array.from({ length: 42 }, (_, i) => addDays(from, i));
   const monthIndex = startOfMonth(anchorDate).getMonth();
   const today = new Date();
+
+  function dropOnDay(e: DragEvent, day: Date) {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = getTaskDragId(e.dataTransfer);
+    if (id) onDropTaskOnDay(id, day);
+  }
 
   return (
     <div className="stickies-month">
@@ -63,12 +71,7 @@ export default function MonthView({
                 .join(' ')}
               onClick={() => onSelectDate(day)}
               onDragOver={allowTaskDrop}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const id = getTaskDragId(e.dataTransfer);
-                if (id) onDropTaskOnDay(id, day);
-              }}
+              onDrop={(e) => dropOnDay(e, day)}
             >
               <span className="stickies-month__daynum">{day.getDate()}</span>
               {visible.map((task) => (
@@ -77,6 +80,7 @@ export default function MonthView({
                   task={task}
                   onOpen={() => onOpenTask(task.id)}
                   onToggleComplete={() => onToggleComplete(task)}
+                  onDrop={(e) => dropOnDay(e, day)}
                 />
               ))}
               {overflow > 0 && (
