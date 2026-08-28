@@ -35,6 +35,13 @@ enum ResourceType {
   skill
   expert
   knowledge
+  app
+}
+
+enum TaskPriority {
+  high
+  medium
+  low
 }
 
 enum McpTransport {
@@ -95,6 +102,9 @@ model Tenant {
   sessions         Session[]
   attachments      Attachment[]
   aclEntries       AclEntry[]
+  appRegistry       AppRegistry[]
+  tasks             Task[]
+  taskNotifications TaskNotification[]
 
   @@map("tenants")
 }
@@ -499,4 +509,64 @@ model KnowledgeHit {
 
   @@index([runId])
   @@map("knowledge_hits")
+}
+
+model AppRegistry {
+  id                   String     @id @default(cuid())
+  tenantId             String     @map("tenant_id")
+  slug                 String
+  name                 String
+  description          String     @db.VarChar(512)
+  enabled              Boolean    @default(true)
+  visibility           Visibility @default(tenant)
+  ownerUserId          String     @map("owner_user_id")
+  defaultModelConfigId String?    @map("default_model_config_id")
+  aiActionsEnabled     Json       @default("[\"parse\",\"polish\",\"to-checklist\",\"expand\",\"extract-reminder\",\"suggest-labels\",\"digest\"]") @map("ai_actions_enabled")
+  createdAt            DateTime   @default(now()) @map("created_at")
+  updatedAt            DateTime   @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, enabled])
+  @@map("app_registry")
+}
+
+model Task {
+  id              String       @id @default(cuid())
+  tenantId        String       @map("tenant_id")
+  userId          String       @map("user_id")
+  title           String
+  notes           String       @default("") @db.Text
+  completed       Boolean      @default(false)
+  completedAt     DateTime?    @map("completed_at")
+  priority        TaskPriority @default(medium)
+  dueAt           DateTime     @map("due_at")
+  allDay          Boolean      @default(true) @map("all_day")
+  reminderAt      DateTime?    @map("reminder_at")
+  reminderFiredAt DateTime?    @map("reminder_fired_at")
+  sortOrder       Int          @default(0) @map("sort_order")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, dueAt])
+  @@index([tenantId, userId, reminderAt])
+  @@map("tasks")
+}
+
+model TaskNotification {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  taskId    String   @map("task_id")
+  message   String   @db.VarChar(512)
+  firedAt   DateTime @default(now()) @map("fired_at")
+  read      Boolean  @default(false)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, read, firedAt])
+  @@map("task_notifications")
 }
