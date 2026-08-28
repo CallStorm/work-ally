@@ -36,6 +36,7 @@ export const ResourceType = z.enum([
   'skills',
   'experts',
   'knowledge',
+  'apps',
 ]);
 export type ResourceType = z.infer<typeof ResourceType>;
 
@@ -118,6 +119,42 @@ export const ResetMemberPasswordSchema = z.object({
   password: z.string().min(6).max(128),
 });
 export type ResetMemberPasswordInput = z.infer<typeof ResetMemberPasswordSchema>;
+
+export const STICKIES_SLUG = 'stickies';
+
+export const TaskPrioritySchema = z.enum(['high', 'medium', 'low']);
+export type TaskPriority = z.infer<typeof TaskPrioritySchema>;
+
+export const CreateTaskSchema = z.object({
+  title: z.string().min(1).max(200),
+  notes: z.string().max(50000).optional().default(''),
+  priority: TaskPrioritySchema.optional().default('medium'),
+  dueAt: z.string().datetime().optional(),
+  allDay: z.boolean().optional().default(true),
+  reminderAt: z.string().datetime().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+export type CreateTaskInput = z.infer<typeof CreateTaskSchema>;
+
+export const UpdateTaskSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  notes: z.string().max(50000).optional(),
+  completed: z.boolean().optional(),
+  priority: TaskPrioritySchema.optional(),
+  dueAt: z.string().datetime().optional(),
+  allDay: z.boolean().optional(),
+  reminderAt: z.string().datetime().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
+
+export const UpdateAppRegistrySchema = z.object({
+  enabled: z.boolean().optional(),
+  defaultModelConfigId: z.string().nullable().optional(),
+  aiActionsEnabled: z.array(z.string()).optional(),
+  visibility: Visibility.optional(),
+});
+export type UpdateAppRegistryInput = z.infer<typeof UpdateAppRegistrySchema>;
 
 export const APP_NAME = 'WorkAlly';
 export const API_PREFIX = '/api';
