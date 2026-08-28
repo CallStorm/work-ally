@@ -99,6 +99,9 @@ export class AclController {
       case 'knowledge':
         await this.prisma.knowledgeBinding.update({ where: { id }, data });
         break;
+      case 'apps':
+        await this.prisma.appRegistry.update({ where: { id }, data });
+        break;
     }
   }
 
@@ -114,6 +117,8 @@ export class AclController {
         return this.prisma.knowledgeBinding.findFirst({
           where: { id, tenantId },
         });
+      case 'apps':
+        return this.prisma.appRegistry.findFirst({ where: { id, tenantId } });
     }
   }
 }

@@ -18,6 +18,7 @@ import { SessionsModule } from './modules/sessions/sessions.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { RuntimeModule } from './modules/runtime/runtime.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
+import { AppsModule } from './modules/apps/apps.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { WorkspaceModule } from './modules/workspace/workspace.module';
     AttachmentsModule,
     RuntimeModule,
     WorkspaceModule,
+    AppsModule,
   ],
   controllers: [HealthController],
 })

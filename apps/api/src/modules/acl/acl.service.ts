@@ -4,13 +4,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../../common/current-user.decorator';
 
 const prismaResourceType: Record<
-  'connectors' | 'skills' | 'experts' | 'knowledge',
+  'connectors' | 'skills' | 'experts' | 'knowledge' | 'apps',
   ResourceType
 > = {
   connectors: 'connector',
   skills: 'skill',
   experts: 'expert',
   knowledge: 'knowledge',
+  apps: 'app',
 };
 
 export type AssetKind = keyof typeof prismaResourceType;
