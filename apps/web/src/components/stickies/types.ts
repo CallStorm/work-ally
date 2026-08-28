@@ -17,6 +17,13 @@ export type Task = {
   updatedAt: string;
 };
 
+export type TaskPatch = Partial<
+  Pick<
+    Task,
+    'title' | 'notes' | 'completed' | 'priority' | 'dueAt' | 'allDay' | 'reminderAt'
+  >
+>;
+
 export type TaskNotification = {
   id: string;
   taskId: string;

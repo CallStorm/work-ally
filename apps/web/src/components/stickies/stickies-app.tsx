@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DayView from './day-view';
 import MonthView from './month-view';
 import QuickAdd from './quick-add';
+import TaskDetailDrawer from './task-detail-drawer';
 import WeekView from './week-view';
 import {
   addDays,
@@ -14,7 +15,7 @@ import {
   toAllDayDueAt,
   toTimedDueAt,
 } from './date-utils';
-import type { CalendarView, Task, TaskNotification } from './types';
+import type { CalendarView, Task, TaskNotification, TaskPatch } from './types';
 import { apiFetch } from '@/lib/api';
 
 function shiftAnchor(current: Date, view: CalendarView, dir: number): Date {
@@ -39,6 +40,21 @@ function rangeTitle(view: CalendarView, anchor: Date): string {
     return `${formatYmd(from)} – ${formatYmd(to)}`;
   }
   return formatYmd(startOfLocalDay(anchor));
+}
+
+function applyTaskPatch(task: Task, patch: TaskPatch): Task {
+  return {
+    ...task,
+    ...patch,
+    completedAt:
+      patch.completed === undefined
+        ? task.completedAt
+        : patch.completed
+          ? new Date().toISOString()
+          : null,
+    reminderFiredAt:
+      patch.reminderAt !== undefined ? null : task.reminderFiredAt,
+  };
 }
 
 export default function StickiesApp() {
@@ -129,15 +145,6 @@ export default function StickiesApp() {
       document.removeEventListener('keydown', onKey);
     };
   }, [bellOpen]);
-
-  useEffect(() => {
-    if (!selectedTaskId) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setSelectedTaskId(null);
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [selectedTaskId]);
 
   async function handleCreate(title: string) {
     const created = await apiFetch<Task>('/apps/stickies/tasks', {
@@ -232,6 +239,38 @@ export default function StickiesApp() {
     } catch {
       await loadTasks();
     }
+  }
+
+  async function handleTaskPatch(id: string, patch: TaskPatch) {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? applyTaskPatch(t, patch) : t)),
+    );
+    try {
+      const updated = await apiFetch<Task>(`/apps/stickies/tasks/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(patch),
+      });
+      setTasks((prev) => {
+        if (hideCompleted && updated.completed) {
+          return prev.filter((t) => t.id !== updated.id);
+        }
+        if (prev.some((t) => t.id === updated.id)) {
+          return prev.map((t) => (t.id === updated.id ? updated : t));
+        }
+        return [...prev, updated];
+      });
+      if (hideCompleted && updated.completed) {
+        setSelectedTaskId((cur) => (cur === updated.id ? null : cur));
+      }
+    } catch {
+      await loadTasks();
+    }
+  }
+
+  async function handleTaskDelete(id: string) {
+    await apiFetch(`/apps/stickies/tasks/${id}`, { method: 'DELETE' });
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    setSelectedTaskId((cur) => (cur === id ? null : cur));
   }
 
   function goToday() {
@@ -428,31 +467,14 @@ export default function StickiesApp() {
         />
       )}
 
-      {selectedTaskId && (
-        <div
-          className="stickies-stub"
-          role="dialog"
-          style={{
-            position: 'fixed',
-            right: 24,
-            top: 88,
-            width: 280,
-            zIndex: 30,
-            background: 'rgba(255,255,255,0.96)',
-            border: '1px solid rgba(28, 43, 40, 0.1)',
-            borderRadius: 16,
-            padding: 16,
-            boxShadow: '0 12px 32px rgba(16,24,32,0.12)',
-          }}
-        >
-          <strong>{selectedTask?.title ?? '任务'}</strong>
-          <p style={{ margin: '8px 0 12px', color: 'var(--stickies-muted)' }}>
-            详情侧栏下一批接入
-          </p>
-          <button type="button" onClick={() => setSelectedTaskId(null)}>
-            关闭
-          </button>
-        </div>
+      {selectedTask && (
+        <TaskDetailDrawer
+          key={selectedTask.id}
+          task={selectedTask}
+          onClose={() => setSelectedTaskId(null)}
+          onChange={(patch) => void handleTaskPatch(selectedTask.id, patch)}
+          onDelete={() => handleTaskDelete(selectedTask.id)}
+        />
       )}
 
       <QuickAdd onCreate={handleCreate} />
