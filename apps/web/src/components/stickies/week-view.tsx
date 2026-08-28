@@ -12,6 +12,7 @@ export default function WeekView({
   onOpenTask,
   onToggleComplete,
   onCreateAt,
+  onDropTaskOnSlot,
 }: {
   anchorDate: Date;
   selectedDate: Date;
@@ -20,6 +21,7 @@ export default function WeekView({
   onOpenTask: (id: string) => void;
   onToggleComplete: (task: Task) => void;
   onCreateAt: (day: Date, hour: number) => void;
+  onDropTaskOnSlot: (taskId: string, day: Date, hour: number) => void;
 }) {
   const from = startOfWeek(anchorDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(from, i));
@@ -33,6 +35,7 @@ export default function WeekView({
       onOpenTask={onOpenTask}
       onToggleComplete={onToggleComplete}
       onCreateAt={onCreateAt}
+      onDropTaskOnSlot={onDropTaskOnSlot}
     />
   );
 }

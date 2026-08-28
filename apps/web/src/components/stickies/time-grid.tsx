@@ -1,6 +1,6 @@
 'use client';
 
-import TaskChip from './task-chip';
+import TaskChip, { allowTaskDrop, getTaskDragId } from './task-chip';
 import { formatYmd, sameLocalDay, tasksOnLocalDay } from './date-utils';
 import type { Task } from './types';
 
@@ -21,6 +21,7 @@ export default function TimeGrid({
   onOpenTask,
   onToggleComplete,
   onCreateAt,
+  onDropTaskOnSlot,
 }: {
   days: Date[];
   selectedDate: Date;
@@ -30,6 +31,7 @@ export default function TimeGrid({
   onOpenTask: (id: string) => void;
   onToggleComplete: (task: Task) => void;
   onCreateAt: (day: Date, hour: number) => void;
+  onDropTaskOnSlot: (taskId: string, day: Date, hour: number) => void;
 }) {
   const today = new Date();
   const columns = `48px repeat(${days.length}, minmax(0, 1fr))`;
@@ -123,6 +125,13 @@ export default function TimeGrid({
                     }
                     onClick={() => {
                       if (isEmpty) onCreateAt(day, hour);
+                    }}
+                    onDragOver={allowTaskDrop}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const id = getTaskDragId(e.dataTransfer);
+                      if (id) onDropTaskOnSlot(id, day, hour);
                     }}
                     onKeyDown={(e) => {
                       if (!isEmpty) return;

@@ -11,6 +11,7 @@ export default function DayView({
   onOpenTask,
   onToggleComplete,
   onCreateAt,
+  onDropTaskOnSlot,
 }: {
   anchorDate: Date;
   selectedDate: Date;
@@ -19,6 +20,7 @@ export default function DayView({
   onOpenTask: (id: string) => void;
   onToggleComplete: (task: Task) => void;
   onCreateAt: (day: Date, hour: number) => void;
+  onDropTaskOnSlot: (taskId: string, day: Date, hour: number) => void;
 }) {
   const day = startOfLocalDay(selectedDate);
 
@@ -32,6 +34,7 @@ export default function DayView({
       onOpenTask={onOpenTask}
       onToggleComplete={onToggleComplete}
       onCreateAt={onCreateAt}
+      onDropTaskOnSlot={onDropTaskOnSlot}
     />
   );
 }

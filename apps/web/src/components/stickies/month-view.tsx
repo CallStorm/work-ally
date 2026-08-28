@@ -1,6 +1,6 @@
 'use client';
 
-import TaskChip from './task-chip';
+import TaskChip, { allowTaskDrop, getTaskDragId } from './task-chip';
 import {
   addDays,
   rangeForView,
@@ -20,6 +20,7 @@ export default function MonthView({
   onSelectDate,
   onOpenTask,
   onToggleComplete,
+  onDropTaskOnDay,
 }: {
   anchorDate: Date;
   selectedDate: Date;
@@ -27,6 +28,7 @@ export default function MonthView({
   onSelectDate: (day: Date) => void;
   onOpenTask: (id: string) => void;
   onToggleComplete: (task: Task) => void;
+  onDropTaskOnDay: (taskId: string, day: Date) => void;
 }) {
   const { from } = rangeForView('month', anchorDate);
   const days = Array.from({ length: 42 }, (_, i) => addDays(from, i));
@@ -84,6 +86,13 @@ export default function MonthView({
                 .filter(Boolean)
                 .join(' ')}
               onClick={() => onSelectDate(day)}
+              onDragOver={allowTaskDrop}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const id = getTaskDragId(e.dataTransfer);
+                if (id) onDropTaskOnDay(id, day);
+              }}
               style={{
                 display: 'flex',
                 flexDirection: 'column',

@@ -9,6 +9,8 @@ import WeekView from './week-view';
 import {
   addDays,
   formatYmd,
+  moveTaskToDay,
+  moveTaskToSlot,
   rangeForView,
   startOfLocalDay,
   startOfWeek,
@@ -241,6 +243,22 @@ export default function StickiesApp() {
     }
   }
 
+  function handleDropOnDay(taskId: string, day: Date) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const patch = moveTaskToDay(task, day);
+    if (patch.dueAt === task.dueAt && patch.allDay === task.allDay) return;
+    void handleTaskPatch(taskId, patch);
+  }
+
+  function handleDropOnSlot(taskId: string, day: Date, hour: number) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const patch = moveTaskToSlot(day, hour);
+    if (patch.dueAt === task.dueAt && patch.allDay === task.allDay) return;
+    void handleTaskPatch(taskId, patch);
+  }
+
   async function handleTaskPatch(id: string, patch: TaskPatch) {
     setTasks((prev) =>
       prev.map((t) => (t.id === id ? applyTaskPatch(t, patch) : t)),
@@ -444,6 +462,7 @@ export default function StickiesApp() {
           onSelectDate={handleSelectDate}
           onOpenTask={setSelectedTaskId}
           onToggleComplete={(task) => void handleToggleComplete(task)}
+          onDropTaskOnDay={handleDropOnDay}
         />
       ) : view === 'week' ? (
         <WeekView
@@ -454,6 +473,7 @@ export default function StickiesApp() {
           onOpenTask={setSelectedTaskId}
           onToggleComplete={(task) => void handleToggleComplete(task)}
           onCreateAt={(day, hour) => void handleCreateAt(day, hour)}
+          onDropTaskOnSlot={handleDropOnSlot}
         />
       ) : (
         <DayView
@@ -464,6 +484,7 @@ export default function StickiesApp() {
           onOpenTask={setSelectedTaskId}
           onToggleComplete={(task) => void handleToggleComplete(task)}
           onCreateAt={(day, hour) => void handleCreateAt(day, hour)}
+          onDropTaskOnSlot={handleDropOnSlot}
         />
       )}
 

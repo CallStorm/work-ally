@@ -1,4 +1,4 @@
-import type { CalendarView } from './types';
+import type { CalendarView, Task } from './types';
 
 export function startOfLocalDay(d: Date): Date {
   const x = new Date(d);
@@ -78,4 +78,29 @@ export function tasksOnLocalDay<T extends { dueAt: string }>(
 ): T[] {
   const key = formatYmd(day);
   return tasks.filter((t) => formatYmd(new Date(t.dueAt)) === key);
+}
+
+/** Keep all-day vs clock time when moving a task to another calendar day. */
+export function moveTaskToDay(
+  task: Task,
+  day: Date,
+): { dueAt: string; allDay: boolean } {
+  if (task.allDay) {
+    return { dueAt: toAllDayDueAt(day), allDay: true };
+  }
+  const old = new Date(task.dueAt);
+  const next = startOfLocalDay(day);
+  next.setHours(old.getHours(), old.getMinutes(), 0, 0);
+  return { dueAt: next.toISOString(), allDay: false };
+}
+
+/** Place a task on a timed hour slot (clears all-day). */
+export function moveTaskToSlot(
+  day: Date,
+  hour: number,
+  minute = 0,
+): { dueAt: string; allDay: boolean } {
+  const next = startOfLocalDay(day);
+  next.setHours(hour, minute, 0, 0);
+  return { dueAt: next.toISOString(), allDay: false };
 }
