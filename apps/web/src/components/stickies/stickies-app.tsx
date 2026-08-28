@@ -1,8 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import DayView from './day-view';
 import MonthView from './month-view';
 import QuickAdd from './quick-add';
+import WeekView from './week-view';
 import {
   addDays,
   formatYmd,
@@ -10,6 +12,7 @@ import {
   startOfLocalDay,
   startOfWeek,
   toAllDayDueAt,
+  toTimedDueAt,
 } from './date-utils';
 import type { CalendarView, Task, TaskNotification } from './types';
 import { apiFetch } from '@/lib/api';
@@ -146,6 +149,30 @@ export default function StickiesApp() {
       }),
     });
     setTasks((prev) => [...prev, created]);
+  }
+
+  async function handleCreateAt(day: Date, hour: number) {
+    const localDay = startOfLocalDay(day);
+    setSelectedDate(localDay);
+    try {
+      const created = await apiFetch<Task>('/apps/stickies/tasks', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: '新任务',
+          dueAt: toTimedDueAt(localDay, hour),
+          allDay: false,
+        }),
+      });
+      setTasks((prev) => [...prev, created]);
+    } catch {
+      await loadTasks();
+    }
+  }
+
+  function handleSelectDate(day: Date) {
+    const localDay = startOfLocalDay(day);
+    setSelectedDate(localDay);
+    setAnchorDate(localDay);
   }
 
   async function handleToggleComplete(task: Task) {
@@ -355,10 +382,26 @@ export default function StickiesApp() {
           onOpenTask={setSelectedTaskId}
           onToggleComplete={(task) => void handleToggleComplete(task)}
         />
+      ) : view === 'week' ? (
+        <WeekView
+          anchorDate={anchorDate}
+          selectedDate={selectedDate}
+          tasks={tasks}
+          onSelectDate={handleSelectDate}
+          onOpenTask={setSelectedTaskId}
+          onToggleComplete={(task) => void handleToggleComplete(task)}
+          onCreateAt={(day, hour) => void handleCreateAt(day, hour)}
+        />
       ) : (
-        <div className="stickies-app__empty">
-          <p>{view === 'week' ? '周视图下一批接入' : '日视图下一批接入'}</p>
-        </div>
+        <DayView
+          anchorDate={anchorDate}
+          selectedDate={selectedDate}
+          tasks={tasks}
+          onSelectDate={handleSelectDate}
+          onOpenTask={setSelectedTaskId}
+          onToggleComplete={(task) => void handleToggleComplete(task)}
+          onCreateAt={(day, hour) => void handleCreateAt(day, hour)}
+        />
       )}
 
       {selectedTaskId && (

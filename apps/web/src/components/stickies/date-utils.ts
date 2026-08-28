@@ -32,6 +32,17 @@ export function toAllDayDueAt(localDay: Date): string {
   return startOfLocalDay(localDay).toISOString();
 }
 
+/** Local calendar day at `hour:minute` as UTC ISO. */
+export function toTimedDueAt(
+  localDay: Date,
+  hour: number,
+  minute = 0,
+): string {
+  const x = startOfLocalDay(localDay);
+  x.setHours(hour, minute, 0, 0);
+  return x.toISOString();
+}
+
 export function formatYmd(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
