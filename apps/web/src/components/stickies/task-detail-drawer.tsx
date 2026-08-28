@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
 import {
   formatYmd,
   startOfLocalDay,
@@ -11,50 +10,6 @@ import {
 import type { Task, TaskPatch, TaskPriority } from './types';
 
 const DEBOUNCE_MS = 400;
-
-const overlayStyle: CSSProperties = {
-  position: 'fixed',
-  inset: 0,
-  zIndex: 40,
-  background: 'rgba(16, 24, 32, 0.28)',
-};
-
-const panelStyle: CSSProperties = {
-  position: 'fixed',
-  top: 0,
-  right: 0,
-  bottom: 0,
-  zIndex: 41,
-  width: 360,
-  maxWidth: '100vw',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 14,
-  padding: '20px 20px 24px',
-  background: 'rgba(255,255,255,0.98)',
-  borderLeft: '1px solid rgba(28, 43, 40, 0.1)',
-  boxShadow: '-12px 0 32px rgba(16,24,32,0.1)',
-  color: 'var(--stickies-ink)',
-  overflow: 'auto',
-};
-
-const fieldStyle: CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  border: '1px solid rgba(28, 43, 40, 0.12)',
-  borderRadius: 8,
-  padding: '8px 10px',
-  font: 'inherit',
-  color: 'var(--stickies-ink)',
-  background: '#fff',
-};
-
-const labelStyle: CSSProperties = {
-  display: 'block',
-  fontSize: 12,
-  color: 'var(--stickies-muted)',
-  marginBottom: 6,
-};
 
 function pad2(n: number) {
   return String(n).padStart(2, '0');
@@ -221,7 +176,6 @@ export default function TaskDetailDrawer({
     <>
       <div
         className="stickies-drawer__overlay"
-        style={overlayStyle}
         onClick={onClose}
         aria-hidden
       />
@@ -230,36 +184,21 @@ export default function TaskDetailDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="stickies-drawer-title"
-        style={panelStyle}
         onClick={(e) => e.stopPropagation()}
       >
-        <header
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-          }}
-        >
+        <header className="stickies-drawer__head">
           <strong id="stickies-drawer-title">任务详情</strong>
           <button
             type="button"
+            className="stickies-drawer__close"
             aria-label="关闭"
             onClick={onClose}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              fontSize: 18,
-              lineHeight: 1,
-              color: 'var(--stickies-muted)',
-            }}
           >
             ×
           </button>
         </header>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <label className="stickies-drawer__check">
           <input
             type="checkbox"
             checked={completed}
@@ -273,35 +212,31 @@ export default function TaskDetailDrawer({
         </label>
 
         <div>
-          <label htmlFor="stickies-task-title" style={labelStyle}>
+          <label htmlFor="stickies-task-title" className="stickies-drawer__label">
             标题
           </label>
           <input
             id="stickies-task-title"
+            className="stickies-drawer__field"
             value={title}
             onChange={(e) => {
               const next = e.target.value;
               setTitle(next);
               schedule({ title: next });
             }}
-            style={fieldStyle}
           />
         </div>
 
         <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: allDay ? '1fr auto' : '1fr 1fr',
-            gap: 12,
-            alignItems: 'end',
-          }}
+          className={`stickies-drawer__row ${allDay ? 'stickies-drawer__row--allday' : 'stickies-drawer__row--split'}`}
         >
           <div>
-            <label htmlFor="stickies-task-date" style={labelStyle}>
+            <label htmlFor="stickies-task-date" className="stickies-drawer__label">
               日期
             </label>
             <input
               id="stickies-task-date"
+              className="stickies-drawer__field"
               type="date"
               value={date}
               onChange={(e) => {
@@ -309,19 +244,10 @@ export default function TaskDetailDrawer({
                 setDate(next);
                 applyDue(next, allDay, time);
               }}
-              style={fieldStyle}
             />
           </div>
           {allDay ? (
-            <label
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                paddingBottom: 8,
-                whiteSpace: 'nowrap',
-              }}
-            >
+            <label className="stickies-drawer__check stickies-drawer__check--end">
               <input
                 type="checkbox"
                 checked={allDay}
@@ -337,11 +263,12 @@ export default function TaskDetailDrawer({
             </label>
           ) : (
             <div>
-              <label htmlFor="stickies-task-time" style={labelStyle}>
+              <label htmlFor="stickies-task-time" className="stickies-drawer__label">
                 时间
               </label>
               <input
                 id="stickies-task-time"
+                className="stickies-drawer__field"
                 type="time"
                 value={time}
                 onChange={(e) => {
@@ -349,14 +276,13 @@ export default function TaskDetailDrawer({
                   setTime(next);
                   applyDue(date, false, next);
                 }}
-                style={fieldStyle}
               />
             </div>
           )}
         </div>
 
         {!allDay && (
-          <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <label className="stickies-drawer__check">
             <input
               type="checkbox"
               checked={allDay}
@@ -371,18 +297,18 @@ export default function TaskDetailDrawer({
         )}
 
         <div>
-          <label htmlFor="stickies-task-priority" style={labelStyle}>
+          <label htmlFor="stickies-task-priority" className="stickies-drawer__label">
             优先级
           </label>
           <select
             id="stickies-task-priority"
+            className="stickies-drawer__field"
             value={priority}
             onChange={(e) => {
               const next = e.target.value as TaskPriority;
               setPriority(next);
               schedule({ priority: next });
             }}
-            style={fieldStyle}
           >
             <option value="high">高</option>
             <option value="medium">中</option>
@@ -391,12 +317,13 @@ export default function TaskDetailDrawer({
         </div>
 
         <div>
-          <label htmlFor="stickies-task-reminder" style={labelStyle}>
+          <label htmlFor="stickies-task-reminder" className="stickies-drawer__label">
             提醒
           </label>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="stickies-drawer__reminder">
             <input
               id="stickies-task-reminder"
+              className="stickies-drawer__field"
               type="datetime-local"
               value={reminder}
               onChange={(e) => {
@@ -404,21 +331,14 @@ export default function TaskDetailDrawer({
                 setReminder(next);
                 schedule({ reminderAt: fromDatetimeLocalValue(next) });
               }}
-              style={{ ...fieldStyle, flex: 1 }}
             />
             {reminder && (
               <button
                 type="button"
+                className="stickies-drawer__clear"
                 onClick={() => {
                   setReminder('');
                   schedule({ reminderAt: null });
-                }}
-                style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--stickies-muted)',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
                 }}
               >
                 清除
@@ -427,12 +347,13 @@ export default function TaskDetailDrawer({
           </div>
         </div>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <label htmlFor="stickies-task-notes" style={labelStyle}>
+        <div className="stickies-drawer__notes">
+          <label htmlFor="stickies-task-notes" className="stickies-drawer__label">
             备注
           </label>
           <textarea
             id="stickies-task-notes"
+            className="stickies-drawer__field"
             value={notes}
             rows={6}
             onChange={(e) => {
@@ -440,24 +361,14 @@ export default function TaskDetailDrawer({
               setNotes(next);
               schedule({ notes: next });
             }}
-            style={{ ...fieldStyle, resize: 'vertical', minHeight: 120 }}
           />
         </div>
 
         <button
           type="button"
+          className="stickies-drawer__delete"
           onClick={() => void handleDelete()}
           disabled={deleting}
-          style={{
-            marginTop: 'auto',
-            border: 'none',
-            background: 'transparent',
-            color: '#c45c4a',
-            cursor: deleting ? 'default' : 'pointer',
-            padding: '8px 0',
-            textAlign: 'left',
-            font: 'inherit',
-          }}
         >
           {deleting ? '删除中…' : '删除任务'}
         </button>

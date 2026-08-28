@@ -36,37 +36,13 @@ export default function MonthView({
   const today = new Date();
 
   return (
-    <div
-      className="stickies-month"
-      style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
-    >
-      <div
-        className="stickies-month__weekdays"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gap: 4,
-          marginBottom: 6,
-          fontSize: 12,
-          color: 'var(--stickies-muted)',
-          textAlign: 'center',
-        }}
-      >
+    <div className="stickies-month">
+      <div className="stickies-month__weekdays">
         {WEEKDAYS.map((label) => (
           <div key={label}>{label}</div>
         ))}
       </div>
-      <div
-        className="stickies-month__grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(7, 1fr)',
-          gridTemplateRows: 'repeat(6, minmax(92px, 1fr))',
-          gap: 4,
-          flex: 1,
-          minHeight: 0,
-        }}
-      >
+      <div className="stickies-month__grid">
         {days.map((day) => {
           const dayTasks = tasksOnLocalDay(tasks, day);
           const visible = dayTasks.slice(0, MAX_VISIBLE);
@@ -93,36 +69,8 @@ export default function MonthView({
                 const id = getTaskDragId(e.dataTransfer);
                 if (id) onDropTaskOnDay(id, day);
               }}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 2,
-                minWidth: 0,
-                padding: 6,
-                borderRadius: 10,
-                border: isSelected
-                  ? '1.5px solid #3d8f74'
-                  : '1px solid rgba(28, 43, 40, 0.08)',
-                background: isSelected
-                  ? 'rgba(184, 228, 210, 0.35)'
-                  : isToday
-                    ? 'rgba(251, 246, 224, 0.7)'
-                    : 'rgba(255, 255, 255, 0.65)',
-                opacity: inMonth ? 1 : 0.45,
-                cursor: 'pointer',
-                overflow: 'hidden',
-              }}
             >
-              <span
-                className="stickies-month__daynum"
-                style={{
-                  fontSize: 12,
-                  fontWeight: isToday || isSelected ? 700 : 500,
-                  alignSelf: 'flex-end',
-                }}
-              >
-                {day.getDate()}
-              </span>
+              <span className="stickies-month__daynum">{day.getDate()}</span>
               {visible.map((task) => (
                 <TaskChip
                   key={task.id}
@@ -132,12 +80,7 @@ export default function MonthView({
                 />
               ))}
               {overflow > 0 && (
-                <div
-                  className="stickies-month__more"
-                  style={{ fontSize: 11, color: 'var(--stickies-muted)', paddingLeft: 4 }}
-                >
-                  +{overflow}
-                </div>
+                <div className="stickies-month__more">+{overflow}</div>
               )}
             </div>
           );

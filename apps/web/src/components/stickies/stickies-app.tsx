@@ -321,11 +321,7 @@ export default function StickiesApp() {
     <div className="stickies-app">
       <header className="stickies-app__header">
         <div className="stickies-app__brand">
-          <span className="stickies-app__logo" aria-hidden>
-            <span className="stickies-app__logo-sheet stickies-app__logo-sheet--a" />
-            <span className="stickies-app__logo-sheet stickies-app__logo-sheet--b" />
-            <span className="stickies-app__logo-sheet stickies-app__logo-sheet--c" />
-          </span>
+          <span className="stickies-app__logo" aria-hidden />
           <div>
             <h1>闪签</h1>
             <p>日历任务</p>
@@ -350,10 +346,7 @@ export default function StickiesApp() {
               </button>
             ))}
           </div>
-          <div
-            className="stickies-app__cal-nav"
-            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-          >
+          <div className="stickies-app__cal-nav">
             <button
               type="button"
               aria-label="上一区间"
@@ -361,9 +354,7 @@ export default function StickiesApp() {
             >
               ‹
             </button>
-            <strong style={{ minWidth: 120, textAlign: 'center' }}>
-              {rangeTitle(view, anchorDate)}
-            </strong>
+            <strong>{rangeTitle(view, anchorDate)}</strong>
             <button
               type="button"
               aria-label="下一区间"
@@ -381,17 +372,8 @@ export default function StickiesApp() {
           </button>
           <button
             type="button"
-            className={hideCompleted ? 'is-active' : undefined}
+            className={`stickies-app__toggle${hideCompleted ? ' is-active' : ''}`}
             onClick={() => setHideCompleted((v) => !v)}
-            style={{
-              border: 'none',
-              background: hideCompleted ? 'rgba(61, 143, 116, 0.15)' : 'transparent',
-              borderRadius: 999,
-              padding: '6px 10px',
-              cursor: 'pointer',
-              color: 'inherit',
-              font: 'inherit',
-            }}
           >
             隐藏已完成
           </button>
@@ -452,41 +434,43 @@ export default function StickiesApp() {
         </div>
       </header>
 
-      {loading ? (
-        <div className="stickies-app__empty">加载中…</div>
-      ) : view === 'month' ? (
-        <MonthView
-          anchorDate={anchorDate}
-          selectedDate={selectedDate}
-          tasks={tasks}
-          onSelectDate={handleSelectDate}
-          onOpenTask={setSelectedTaskId}
-          onToggleComplete={(task) => void handleToggleComplete(task)}
-          onDropTaskOnDay={handleDropOnDay}
-        />
-      ) : view === 'week' ? (
-        <WeekView
-          anchorDate={anchorDate}
-          selectedDate={selectedDate}
-          tasks={tasks}
-          onSelectDate={handleSelectDate}
-          onOpenTask={setSelectedTaskId}
-          onToggleComplete={(task) => void handleToggleComplete(task)}
-          onCreateAt={(day, hour) => void handleCreateAt(day, hour)}
-          onDropTaskOnSlot={handleDropOnSlot}
-        />
-      ) : (
-        <DayView
-          anchorDate={anchorDate}
-          selectedDate={selectedDate}
-          tasks={tasks}
-          onSelectDate={handleSelectDate}
-          onOpenTask={setSelectedTaskId}
-          onToggleComplete={(task) => void handleToggleComplete(task)}
-          onCreateAt={(day, hour) => void handleCreateAt(day, hour)}
-          onDropTaskOnSlot={handleDropOnSlot}
-        />
-      )}
+      <div className="stickies-cal">
+        {loading ? (
+          <div className="stickies-app__empty">加载中…</div>
+        ) : view === 'month' ? (
+          <MonthView
+            anchorDate={anchorDate}
+            selectedDate={selectedDate}
+            tasks={tasks}
+            onSelectDate={handleSelectDate}
+            onOpenTask={setSelectedTaskId}
+            onToggleComplete={(task) => void handleToggleComplete(task)}
+            onDropTaskOnDay={handleDropOnDay}
+          />
+        ) : view === 'week' ? (
+          <WeekView
+            anchorDate={anchorDate}
+            selectedDate={selectedDate}
+            tasks={tasks}
+            onSelectDate={handleSelectDate}
+            onOpenTask={setSelectedTaskId}
+            onToggleComplete={(task) => void handleToggleComplete(task)}
+            onCreateAt={(day, hour) => void handleCreateAt(day, hour)}
+            onDropTaskOnSlot={handleDropOnSlot}
+          />
+        ) : (
+          <DayView
+            anchorDate={anchorDate}
+            selectedDate={selectedDate}
+            tasks={tasks}
+            onSelectDate={handleSelectDate}
+            onOpenTask={setSelectedTaskId}
+            onToggleComplete={(task) => void handleToggleComplete(task)}
+            onCreateAt={(day, hour) => void handleCreateAt(day, hour)}
+            onDropTaskOnSlot={handleDropOnSlot}
+          />
+        )}
+      </div>
 
       {selectedTask && (
         <TaskDetailDrawer

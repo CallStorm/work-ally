@@ -35,7 +35,7 @@ export default function TaskChip({
 
   return (
     <div
-      className="task-chip"
+      className={`task-chip${task.completed ? ' is-done' : ''}`}
       role="button"
       tabIndex={0}
       draggable
@@ -64,21 +64,6 @@ export default function TaskChip({
           onOpen();
         }
       }}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6,
-        width: '100%',
-        minWidth: 0,
-        padding: '2px 4px',
-        borderRadius: 6,
-        cursor: 'grab',
-        opacity: task.completed ? 0.55 : 1,
-        textDecoration: task.completed ? 'line-through' : 'none',
-        fontSize: 12,
-        lineHeight: 1.3,
-        color: 'inherit',
-      }}
     >
       <input
         type="checkbox"
@@ -90,29 +75,13 @@ export default function TaskChip({
           e.stopPropagation();
           onToggleComplete();
         }}
-        style={{ margin: 0, flexShrink: 0, cursor: 'pointer' }}
       />
       <span
+        className="task-chip__dot"
         aria-hidden
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: 999,
-          background: PRIORITY_DOT[task.priority],
-          flexShrink: 0,
-        }}
+        style={{ background: PRIORITY_DOT[task.priority] }}
       />
-      <span
-        style={{
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          flex: 1,
-          textAlign: 'left',
-        }}
-      >
-        {task.title}
-      </span>
+      <span className="task-chip__title">{task.title}</span>
     </div>
   );
 }

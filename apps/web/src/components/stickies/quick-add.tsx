@@ -37,14 +37,6 @@ export default function QuickAdd({
             void submit();
           }
         }}
-        style={{
-          width: '100%',
-          border: 'none',
-          font: 'inherit',
-          outline: 'none',
-          background: 'transparent',
-          color: 'var(--stickies-ink)',
-        }}
       />
     </footer>
   );
