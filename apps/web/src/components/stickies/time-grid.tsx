@@ -109,15 +109,23 @@ export default function TimeGrid({
                 const slotTasks = tasksOnLocalDay(tasks, day).filter(
                   (t) => !t.allDay && new Date(t.dueAt).getHours() === hour,
                 );
+                const isEmpty = slotTasks.length === 0;
                 return (
                   <div
                     key={`${formatYmd(day)}-${hour}`}
                     className="stickies-timegrid__slot"
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`${formatYmd(day)} ${padHour(hour)} 添加任务`}
-                    onClick={() => onCreateAt(day, hour)}
+                    role={isEmpty ? 'button' : undefined}
+                    tabIndex={isEmpty ? 0 : undefined}
+                    aria-label={
+                      isEmpty
+                        ? `${formatYmd(day)} ${padHour(hour)} 添加任务`
+                        : undefined
+                    }
+                    onClick={() => {
+                      if (isEmpty) onCreateAt(day, hour);
+                    }}
                     onKeyDown={(e) => {
+                      if (!isEmpty) return;
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         onCreateAt(day, hour);

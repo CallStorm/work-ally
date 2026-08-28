@@ -5,7 +5,6 @@ import { startOfLocalDay } from './date-utils';
 import type { Task } from './types';
 
 export default function DayView({
-  anchorDate,
   selectedDate,
   tasks,
   onSelectDate,
@@ -21,7 +20,7 @@ export default function DayView({
   onToggleComplete: (task: Task) => void;
   onCreateAt: (day: Date, hour: number) => void;
 }) {
-  const day = startOfLocalDay(anchorDate);
+  const day = startOfLocalDay(selectedDate);
 
   return (
     <TimeGrid

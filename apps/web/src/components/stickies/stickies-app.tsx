@@ -175,6 +175,30 @@ export default function StickiesApp() {
     setAnchorDate(localDay);
   }
 
+  function handleViewChange(next: CalendarView) {
+    setView(next);
+    if (next === 'day' || next === 'week') {
+      setAnchorDate(startOfLocalDay(selectedDate));
+    }
+  }
+
+  function handleShiftRange(dir: number) {
+    const nextAnchor = shiftAnchor(anchorDate, view, dir);
+    setAnchorDate(nextAnchor);
+    if (view === 'day') {
+      setSelectedDate(startOfLocalDay(nextAnchor));
+      return;
+    }
+    if (view === 'week') {
+      const weekStart = startOfWeek(nextAnchor);
+      const weekEnd = addDays(weekStart, 7);
+      const sel = startOfLocalDay(selectedDate);
+      if (sel < weekStart || sel >= weekEnd) {
+        setSelectedDate(weekStart);
+      }
+    }
+  }
+
   async function handleToggleComplete(task: Task) {
     const nextCompleted = !task.completed;
     setTasks((prev) => {
@@ -263,7 +287,7 @@ export default function StickiesApp() {
                 key={key}
                 type="button"
                 className={view === key ? 'is-active' : undefined}
-                onClick={() => setView(key)}
+                onClick={() => handleViewChange(key)}
               >
                 {label}
               </button>
@@ -276,7 +300,7 @@ export default function StickiesApp() {
             <button
               type="button"
               aria-label="上一区间"
-              onClick={() => setAnchorDate((d) => shiftAnchor(d, view, -1))}
+              onClick={() => handleShiftRange(-1)}
             >
               ‹
             </button>
@@ -286,7 +310,7 @@ export default function StickiesApp() {
             <button
               type="button"
               aria-label="下一区间"
-              onClick={() => setAnchorDate((d) => shiftAnchor(d, view, 1))}
+              onClick={() => handleShiftRange(1)}
             >
               ›
             </button>
@@ -378,7 +402,7 @@ export default function StickiesApp() {
           anchorDate={anchorDate}
           selectedDate={selectedDate}
           tasks={tasks}
-          onSelectDate={setSelectedDate}
+          onSelectDate={handleSelectDate}
           onOpenTask={setSelectedTaskId}
           onToggleComplete={(task) => void handleToggleComplete(task)}
         />
