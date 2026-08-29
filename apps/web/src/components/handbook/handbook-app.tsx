@@ -3,11 +3,27 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, apiFetch } from '@/lib/api';
 import { CategoryTree } from './category-tree';
+import { NoteEditor } from './note-editor';
+import { NoteList } from './note-list';
 import type {
   CategorySelection,
   HandbookCategory,
   HandbookNote,
 } from './types';
+
+const AUTOSAVE_MS = 500;
+const BODY_MD_MAX = 50000;
+
+const SAMPLE_TITLE = '示例：发布前检查';
+const SAMPLE_BODY = `# 示例：发布前检查
+
+1. 确认变更单
+2. 备份
+3. 执行发布脚本
+4. 冒烟验证
+`;
+
+type NotePatch = { title?: string; bodyMd?: string };
 
 function notesPath(selection: CategorySelection, query: string) {
   const params = new URLSearchParams();
@@ -24,16 +40,42 @@ function noteMatchesSelection(note: HandbookNote, selection: CategorySelection) 
   return note.categoryId === selection;
 }
 
+function categoryIdForCreate(selection: CategorySelection): string | null {
+  if (selection === 'all' || selection === 'uncategorized') return null;
+  return selection;
+}
+
+function buildNotePatch(patch: NotePatch): {
+  body: NotePatch | null;
+  error: string | null;
+} {
+  const body: NotePatch = {};
+  if (patch.title !== undefined) {
+    const title = patch.title.trim();
+    if (title) body.title = title;
+  }
+  if (patch.bodyMd !== undefined) {
+    if (patch.bodyMd.length > BODY_MD_MAX) {
+      return { body: null, error: '正文超过 50000 字符上限' };
+    }
+    body.bodyMd = patch.bodyMd;
+  }
+  return { body: Object.keys(body).length > 0 ? body : null, error: null };
+}
+
 export function HandbookApp() {
   const [categories, setCategories] = useState<HandbookCategory[]>([]);
   const [notes, setNotes] = useState<HandbookNote[]>([]);
   const [selection, setSelection] = useState<CategorySelection>('all');
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [query] = useState('');
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const fetchIdRef = useRef(0);
+  const hasLoadedRef = useRef(false);
+  const pendingRef = useRef<{ id: string; patch: NotePatch } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadData = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -72,11 +114,90 @@ export function HandbookApp() {
     [selection, query],
   );
 
+  async function flushSave() {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (!pending) return;
+
+    const { body, error } = buildNotePatch(pending.patch);
+    if (error) {
+      setActionError(error);
+      return;
+    }
+    if (!body) return;
+
+    try {
+      const updated = await apiFetch<HandbookNote>(
+        `/apps/handbook/notes/${pending.id}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      );
+      setNotes((prev) =>
+        prev.map((n) => {
+          if (n.id !== updated.id) return n;
+          if (pendingRef.current?.id === n.id) {
+            return { ...n, updatedAt: updated.updatedAt };
+          }
+          return updated;
+        }),
+      );
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '保存失败');
+    }
+  }
+
+  function scheduleSave(id: string, patch: NotePatch) {
+    setNotes((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, ...patch } : n)),
+    );
+    const prev = pendingRef.current;
+    pendingRef.current =
+      prev && prev.id === id
+        ? { id, patch: { ...prev.patch, ...patch } }
+        : { id, patch };
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      timerRef.current = null;
+      void flushSave();
+    }, AUTOSAVE_MS);
+  }
+
   useEffect(() => {
-    void loadData();
+    void loadData({ silent: hasLoadedRef.current }).then(() => {
+      hasLoadedRef.current = true;
+    });
   }, [loadData]);
 
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      const pending = pendingRef.current;
+      pendingRef.current = null;
+      if (!pending) return;
+      const { body } = buildNotePatch(pending.patch);
+      if (!body) return;
+      void apiFetch(`/apps/handbook/notes/${pending.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedNoteId) return;
+    if (!notes.some((n) => n.id === selectedNoteId)) {
+      setSelectedNoteId(null);
+    }
+  }, [notes, selectedNoteId]);
+
   function handleSelect(next: CategorySelection) {
+    void flushSave();
     setActionError(null);
     setSelection(next);
     setSelectedNoteId((current) => {
@@ -87,7 +208,68 @@ export function HandbookApp() {
     });
   }
 
-  async function handleCreate(name: string, parentId?: string | null) {
+  async function handleCreate(
+    extra?: { title?: string; bodyMd?: string },
+  ) {
+    await flushSave();
+    setActionError(null);
+    try {
+      const created = await apiFetch<HandbookNote>('/apps/handbook/notes', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: extra?.title ?? '无标题',
+          bodyMd: extra?.bodyMd ?? '',
+          categoryId: categoryIdForCreate(selection),
+        }),
+      });
+      setNotes((prev) => {
+        if (prev.some((n) => n.id === created.id)) return prev;
+        return [created, ...prev];
+      });
+      setSelectedNoteId(created.id);
+      await loadData({ silent: true });
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '创建笔记失败');
+    }
+  }
+
+  function handleSelectNote(id: string) {
+    if (id !== selectedNoteId) void flushSave();
+    setSelectedNoteId(id);
+  }
+
+  function handleChangeTitle(title: string) {
+    if (!selectedNoteId) return;
+    setActionError(null);
+    scheduleSave(selectedNoteId, { title });
+  }
+
+  function handleChangeBody(bodyMd: string) {
+    if (!selectedNoteId) return;
+    setActionError(null);
+    scheduleSave(selectedNoteId, { bodyMd });
+  }
+
+  async function handleDeleteNote() {
+    if (!selectedNoteId) return;
+    if (!confirm('确定删除该笔记？')) return;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    pendingRef.current = null;
+    setActionError(null);
+    const id = selectedNoteId;
+    try {
+      await apiFetch(`/apps/handbook/notes/${id}`, { method: 'DELETE' });
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      setSelectedNoteId(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : '删除笔记失败');
+    }
+  }
+
+  async function handleCreateCategory(name: string, parentId?: string | null) {
     setActionError(null);
     try {
       await apiFetch<HandbookCategory>('/apps/handbook/categories', {
@@ -116,7 +298,7 @@ export function HandbookApp() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDeleteCategory(id: string) {
     setActionError(null);
     try {
       await apiFetch(`/apps/handbook/categories/${id}`, { method: 'DELETE' });
@@ -134,6 +316,9 @@ export function HandbookApp() {
     }
   }
 
+  const selectedNote =
+    notes.find((n) => n.id === selectedNoteId) ?? null;
+
   return (
     <div className="handbook-app">
       {loadError && (
@@ -147,22 +332,56 @@ export function HandbookApp() {
         </div>
       )}
       {loading && <div className="handbook-app__empty">加载中…</div>}
+      <div className="handbook-app__search">
+        <input
+          type="search"
+          className="handbook-app__search-input"
+          value={query}
+          onChange={(e) => {
+            void flushSave();
+            setQuery(e.target.value);
+          }}
+          placeholder="搜索标题和正文"
+          aria-label="搜索笔记"
+        />
+      </div>
       <div className="handbook-app__cols">
         <aside className="handbook-app__tree">
           <CategoryTree
             categories={categories}
             selection={selection}
             onSelect={handleSelect}
-            onCreate={handleCreate}
+            onCreate={handleCreateCategory}
             onRename={handleRename}
-            onDelete={handleDelete}
+            onDelete={handleDeleteCategory}
           />
         </aside>
         <section className="handbook-app__list">
-          笔记（{notes.length}）
+          <NoteList
+            notes={notes}
+            selectedNoteId={selectedNoteId}
+            query={query}
+            onSelect={handleSelectNote}
+            onCreate={() => handleCreate()}
+            onCreateSample={
+              notes.length === 0 && !query.trim()
+                ? () =>
+                    handleCreate({
+                      title: SAMPLE_TITLE,
+                      bodyMd: SAMPLE_BODY,
+                    })
+                : undefined
+            }
+          />
         </section>
         <section className="handbook-app__editor">
-          {selectedNoteId ? `笔记 ${selectedNoteId}` : '编辑'}
+          <NoteEditor
+            key={selectedNote?.id ?? 'empty'}
+            note={selectedNote}
+            onChangeTitle={handleChangeTitle}
+            onChangeBody={handleChangeBody}
+            onDelete={handleDeleteNote}
+          />
         </section>
       </div>
     </div>
