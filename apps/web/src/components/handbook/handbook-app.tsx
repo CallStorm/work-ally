@@ -86,6 +86,7 @@ export function HandbookApp() {
   const pendingRef = useRef<{ id: string; patch: NotePatch } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deletingIdsRef = useRef(new Set<string>());
+  const inFlightSaveRef = useRef<Promise<void> | null>(null);
   const flushSaveRef = useRef<() => Promise<void>>(async () => {});
 
   const loadData = useCallback(
@@ -126,41 +127,70 @@ export function HandbookApp() {
     [selection, query],
   );
 
-  async function flushSave() {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    const pending = pendingRef.current;
-    pendingRef.current = null;
-    if (!pending) return;
-
-    const { body, error } = buildNotePatch(pending.patch);
-    if (error) {
-      setActionError(error);
+  function requeuePending(failed: { id: string; patch: NotePatch }) {
+    const current = pendingRef.current;
+    if (!current) {
+      pendingRef.current = failed;
       return;
     }
-    if (!body) return;
-
-    try {
-      const updated = await apiFetch<HandbookNote>(
-        `/apps/handbook/notes/${pending.id}`,
-        { method: 'PATCH', body: JSON.stringify(body) },
-      );
-      if (deletingIdsRef.current.has(pending.id)) return;
-      setNotes((prev) =>
-        prev.map((n) => {
-          if (n.id !== updated.id) return n;
-          if (pendingRef.current?.id === n.id) {
-            return { ...n, updatedAt: updated.updatedAt };
-          }
-          return updated;
-        }),
-      );
-    } catch (err) {
-      if (deletingIdsRef.current.has(pending.id)) return;
-      setActionError(err instanceof Error ? err.message : '保存失败');
+    if (current.id === failed.id) {
+      pendingRef.current = {
+        id: failed.id,
+        patch: { ...failed.patch, ...current.patch },
+      };
     }
+  }
+
+  function flushSave(): Promise<void> {
+    if (inFlightSaveRef.current) return inFlightSaveRef.current;
+
+    const work = (async () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      const pending = pendingRef.current;
+      if (!pending) return;
+      pendingRef.current = null;
+
+      const { body, error } = buildNotePatch(pending.patch);
+      if (error) {
+        requeuePending(pending);
+        setActionError(error);
+        return;
+      }
+      if (!body) return;
+
+      try {
+        const updated = await apiFetch<HandbookNote>(
+          `/apps/handbook/notes/${pending.id}`,
+          { method: 'PATCH', body: JSON.stringify(body) },
+        );
+        if (deletingIdsRef.current.has(pending.id)) return;
+        setNotes((prev) =>
+          prev.map((n) => {
+            if (n.id !== updated.id) return n;
+            if (pendingRef.current?.id === n.id) {
+              return { ...n, updatedAt: updated.updatedAt };
+            }
+            return updated;
+          }),
+        );
+      } catch (err) {
+        if (deletingIdsRef.current.has(pending.id)) return;
+        requeuePending(pending);
+        setActionError(err instanceof Error ? err.message : '保存失败');
+      }
+    })();
+
+    let inflight: Promise<void>;
+    inflight = work.finally(() => {
+      if (inFlightSaveRef.current === inflight) {
+        inFlightSaveRef.current = null;
+      }
+    });
+    inFlightSaveRef.current = inflight;
+    return inflight;
   }
 
   flushSaveRef.current = flushSave;
