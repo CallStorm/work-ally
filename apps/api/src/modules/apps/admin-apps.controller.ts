@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  HANDBOOK_SLUG,
+  NOTES_SLUG,
   STICKIES_SLUG,
   UpdateAppRegistrySchema,
 } from '@work-ally/shared';
@@ -34,8 +34,8 @@ export class AdminAppsController {
 
   @Get(':slug')
   async get(@CurrentUser() user: AuthUser, @Param('slug') slug: string) {
-    if (slug === HANDBOOK_SLUG) {
-      await this.registry.ensureHandbook(user.tenantId, user.userId);
+    if (slug === NOTES_SLUG) {
+      await this.registry.ensureNotes(user.tenantId, user.userId);
     }
     const app = await this.registry.getBySlug(user.tenantId, slug);
     if (!app) throw new NotFoundException('应用不存在');
@@ -53,14 +53,14 @@ export class AdminAppsController {
     @Param('slug') slug: string,
     @Body() body: unknown,
   ) {
-    if (slug !== STICKIES_SLUG && slug !== HANDBOOK_SLUG) {
+    if (slug !== STICKIES_SLUG && slug !== NOTES_SLUG) {
       throw new NotFoundException('应用不存在');
     }
     const input = parseBody(UpdateAppRegistrySchema, body);
     const app =
       slug === STICKIES_SLUG
         ? await this.registry.updateStickies(user.tenantId, input)
-        : await this.registry.updateHandbook(user.tenantId, input);
+        : await this.registry.updateNotes(user.tenantId, input);
     if (!app) throw new NotFoundException('应用不存在');
     return this.registry.serialize(app);
   }
