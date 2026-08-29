@@ -72,6 +72,12 @@ function applyPending(
   );
 }
 
+function pendingPatchDiffers(a: NotePatch, b: NotePatch): boolean {
+  if (a.title !== b.title) return true;
+  if (a.bodyMd !== b.bodyMd) return true;
+  return false;
+}
+
 export function HandbookApp() {
   const [categories, setCategories] = useState<HandbookCategory[]>([]);
   const [notes, setNotes] = useState<HandbookNote[]>([]);
@@ -144,6 +150,9 @@ export function HandbookApp() {
   function flushSave(): Promise<void> {
     if (inFlightSaveRef.current) return inFlightSaveRef.current;
 
+    let savedId: string | undefined;
+    let savedPatch: NotePatch | undefined;
+
     const work = (async () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
@@ -152,6 +161,8 @@ export function HandbookApp() {
       const pending = pendingRef.current;
       if (!pending) return;
       pendingRef.current = null;
+      savedId = pending.id;
+      savedPatch = pending.patch;
 
       const { body, error } = buildNotePatch(pending.patch);
       if (error) {
@@ -187,6 +198,15 @@ export function HandbookApp() {
     inflight = work.finally(() => {
       if (inFlightSaveRef.current === inflight) {
         inFlightSaveRef.current = null;
+      }
+      const next = pendingRef.current;
+      if (
+        next &&
+        savedId !== undefined &&
+        savedPatch !== undefined &&
+        (next.id !== savedId || pendingPatchDiffers(next.patch, savedPatch))
+      ) {
+        void flushSave();
       }
     });
     inFlightSaveRef.current = inflight;
