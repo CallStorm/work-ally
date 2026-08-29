@@ -107,6 +107,7 @@ model Tenant {
   taskNotifications TaskNotification[]
   handbookCategories HandbookCategory[]
   handbookNotes      HandbookNote[]
+  notesAiThreads     NotesAiThread[]
 
   @@map("tenants")
 }
@@ -601,10 +602,42 @@ model HandbookNote {
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
-  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  category HandbookCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category  HandbookCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  aiThreads NotesAiThread[]
 
   @@index([tenantId, userId, categoryId])
   @@index([tenantId, userId, updatedAt])
   @@map("handbook_notes")
+}
+
+model NotesAiThread {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  noteId    String   @map("note_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  note     HandbookNote      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  messages NotesAiMessage[]
+
+  @@unique([tenantId, userId, noteId])
+  @@index([tenantId, userId])
+  @@map("notes_ai_threads")
+}
+
+model NotesAiMessage {
+  id        String   @id @default(cuid())
+  threadId  String   @map("thread_id")
+  role      String   // user | assistant | system
+  content   String   @db.Text
+  draftMd   String?  @map("draft_md") @db.LongText
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread NotesAiThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("notes_ai_messages")
 }
