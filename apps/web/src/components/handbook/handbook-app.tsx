@@ -15,15 +15,6 @@ const AUTOSAVE_MS = 500;
 const SEARCH_DEBOUNCE_MS = 300;
 const BODY_MD_MAX = 50000;
 
-const SAMPLE_TITLE = '示例：发布前检查';
-const SAMPLE_BODY = `# 示例：发布前检查
-
-1. 确认变更单
-2. 备份
-3. 执行发布脚本
-4. 冒烟验证
-`;
-
 type NotePatch = { title?: string; bodyMd?: string; categoryId?: string | null };
 
 function notesPath(selection: CategorySelection, query: string) {
@@ -466,15 +457,6 @@ export function HandbookApp() {
             query={query}
             onSelect={(id) => void handleSelectNote(id)}
             onCreate={() => handleCreate()}
-            onCreateSample={
-              notes.length === 0 && !query.trim()
-                ? () =>
-                    handleCreate({
-                      title: SAMPLE_TITLE,
-                      bodyMd: SAMPLE_BODY,
-                    })
-                : undefined
-            }
           />
         </section>
         <section className="handbook-app__editor">

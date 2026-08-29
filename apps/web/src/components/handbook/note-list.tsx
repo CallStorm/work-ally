@@ -8,7 +8,6 @@ export type NoteListProps = {
   query: string;
   onSelect: (id: string) => void;
   onCreate: () => void | Promise<void>;
-  onCreateSample?: () => void | Promise<void>;
 };
 
 function formatUpdatedAt(iso: string) {
@@ -38,7 +37,6 @@ export function NoteList({
   query,
   onSelect,
   onCreate,
-  onCreateSample,
 }: NoteListProps) {
   const searching = Boolean(query.trim());
 
@@ -54,31 +52,11 @@ export function NoteList({
         </button>
       </div>
       {notes.length === 0 ? (
-        <div className="handbook-list__empty">
-          {searching ? (
+        searching ? (
+          <div className="handbook-list__empty">
             <p>没有匹配的笔记</p>
-          ) : (
-            <>
-              <p>还没有笔记。用手册记录工作流程与 SOP。</p>
-              <button
-                type="button"
-                className="handbook-list__new"
-                onClick={() => void onCreate()}
-              >
-                新建第一篇
-              </button>
-              {onCreateSample && (
-                <button
-                  type="button"
-                  className="handbook-list__sample"
-                  onClick={() => void onCreateSample()}
-                >
-                  插入示例：发布前检查
-                </button>
-              )}
-            </>
-          )}
-        </div>
+          </div>
+        ) : null
       ) : (
         <ul className="handbook-list__items">
           {notes.map((note) => (

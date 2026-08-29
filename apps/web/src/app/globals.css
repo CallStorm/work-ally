@@ -2338,8 +2338,7 @@ body.is-dragging-task .task-chip {
   border-bottom: 1px solid var(--line);
 }
 
-.handbook-list__new,
-.handbook-list__sample {
+.handbook-list__new {
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -2351,8 +2350,7 @@ body.is-dragging-task .task-chip {
   padding: 4px 8px;
 }
 
-.handbook-list__new:hover,
-.handbook-list__sample:hover {
+.handbook-list__new:hover {
   background: var(--accent-soft);
 }
 
