@@ -9,6 +9,7 @@ import { NotesAppGuard } from './notes-app.guard';
 import { NotesController } from './notes/notes.controller';
 import { HandbookCategoriesService } from './notes/handbook-categories.service';
 import { HandbookNotesService } from './notes/handbook-notes.service';
+import { NotesAiService } from './notes/notes-ai.service';
 import { StickiesAppGuard } from './stickies-app.guard';
 import { TasksController } from './tasks/tasks.controller';
 import { TasksService } from './tasks/tasks.service';
@@ -29,6 +30,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     NotesAppGuard,
     HandbookCategoriesService,
     HandbookNotesService,
+    NotesAiService,
     TasksService,
     TaskNotificationsService,
     TaskReminderScheduler,
