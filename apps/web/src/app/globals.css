@@ -2025,9 +2025,67 @@ body.is-dragging-task .task-chip {
   color: #0f2e26;
 }
 
-.apps-list-page__card--stickies .apps-list-page__body p {
+.apps-list-page__card--stickies .apps-list-page__body p,
+.apps-list-page__card--handbook .apps-list-page__body p {
   font-size: 13px;
   line-height: 1.5;
+}
+
+.apps-list-page__card--handbook {
+  padding: 0;
+}
+
+.apps-list-page__card--handbook .apps-list-page__cover {
+  background: linear-gradient(160deg, #e8eef8 0%, #d5deec 100%);
+}
+
+.apps-list-page__book {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 72px;
+  transform: translate(-50%, -50%);
+  border-radius: 3px 8px 8px 3px;
+  background: #fff;
+  border: 1px solid rgba(28, 43, 40, 0.1);
+  box-shadow: 0 6px 16px rgba(16, 24, 32, 0.08);
+}
+
+.apps-list-page__book::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  background: #3d5a80;
+  border-radius: 3px 0 0 3px;
+}
+
+.apps-list-page__book::after {
+  content: '';
+  position: absolute;
+  left: 16px;
+  right: 10px;
+  top: 16px;
+  height: 28px;
+  background:
+    linear-gradient(#c5d0de 0 0) 0 0 / 100% 3px no-repeat,
+    linear-gradient(#c5d0de 0 0) 0 10px / 100% 3px no-repeat,
+    linear-gradient(#c5d0de 0 0) 0 20px / 70% 3px no-repeat;
+}
+
+.apps-list-page__card--handbook .apps-list-page__body {
+  padding: 16px 20px 20px;
+}
+
+.apps-list-page__card--handbook .apps-list-page__body h2 {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #1a2a40;
 }
 
 .apps-list-page__meta {
@@ -2047,5 +2105,552 @@ body.is-dragging-task .task-chip {
 
   .stickies-month__grid {
     grid-template-rows: repeat(6, minmax(72px, 1fr));
+  }
+}
+
+/* Handbook personal notes */
+.handbook-app {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.handbook-app__error {
+  margin: 12px 16px 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #8a1f11;
+  font-size: 13px;
+}
+
+.handbook-app__empty {
+  padding: 12px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.handbook-app__search {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.handbook-app__search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+
+.handbook-app__search-input:focus {
+  outline: 2px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.handbook-app__cols {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 200px 260px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.handbook-app__tree,
+.handbook-app__list,
+.handbook-app__editor {
+  min-height: 0;
+  overflow: auto;
+}
+
+.handbook-app__tree {
+  width: 200px;
+  border-right: 1px solid var(--line);
+  padding: 8px;
+}
+
+.handbook-app__list {
+  width: 260px;
+  border-right: 1px solid var(--line);
+}
+
+.handbook-app__editor {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.handbook-tree__list,
+.handbook-tree__children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.handbook-tree__children {
+  padding-left: 16px;
+}
+
+.handbook-tree__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.handbook-tree__item:hover {
+  background: var(--accent-soft);
+}
+
+.handbook-tree__item--active {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.handbook-tree__item--child {
+  font-size: 13px;
+}
+
+.handbook-tree__label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+
+.handbook-tree__more {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.handbook-tree__more:hover {
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.handbook-tree__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.handbook-tree__menu {
+  position: absolute;
+  right: 4px;
+  top: 100%;
+  z-index: 8;
+  min-width: 120px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 8px 20px rgba(16, 24, 32, 0.1);
+}
+
+.handbook-tree__menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.handbook-tree__menu button:hover {
+  background: var(--accent-soft);
+}
+
+.handbook-tree__add {
+  margin-top: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.handbook-tree__add:hover {
+  background: var(--accent-soft);
+}
+
+.handbook-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.handbook-list__head {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.handbook-list__new,
+.handbook-list__sample {
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.handbook-list__new:hover,
+.handbook-list__sample:hover {
+  background: var(--accent-soft);
+}
+
+.handbook-list__empty {
+  padding: 20px 16px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.handbook-list__empty p {
+  margin: 0 0 12px;
+}
+
+.handbook-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+}
+
+.handbook-list__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 4px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.handbook-list__item:hover {
+  background: var(--accent-soft);
+}
+
+.handbook-list__item--active {
+  background: var(--accent-soft);
+}
+
+.handbook-list__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.handbook-list__pin {
+  margin-right: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+}
+
+.handbook-list__time {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.handbook-editor,
+.handbook-editor__empty {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.handbook-editor__empty {
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.handbook-editor__title {
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px 8px;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.handbook-editor__title:focus {
+  outline: none;
+}
+
+.handbook-editor__tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px 0;
+}
+
+.handbook-editor__tab {
+  padding: 6px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.handbook-editor__tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.handbook-editor__body,
+.handbook-editor__preview {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  overflow: auto;
+}
+
+.handbook-editor__body {
+  border: none;
+  resize: none;
+  background: transparent;
+  color: inherit;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.handbook-editor__body:focus {
+  outline: none;
+}
+
+.handbook-editor__delete {
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin: 8px 16px 16px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: #8a1f11;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.handbook-editor__delete:hover {
+  background: #fdecea;
+}
+
+.handbook-markdown {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.handbook-markdown > :first-child {
+  margin-top: 0;
+}
+
+.handbook-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.handbook-markdown p,
+.handbook-markdown ul,
+.handbook-markdown ol,
+.handbook-markdown pre,
+.handbook-markdown blockquote,
+.handbook-markdown table {
+  margin: 0.75em 0;
+}
+
+.handbook-markdown h1,
+.handbook-markdown h2,
+.handbook-markdown h3,
+.handbook-markdown h4 {
+  margin: 1.1em 0 0.5em;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+.handbook-markdown h1 { font-size: 1.5em; }
+.handbook-markdown h2 { font-size: 1.3em; }
+.handbook-markdown h3 { font-size: 1.15em; }
+
+.handbook-markdown ul,
+.handbook-markdown ol {
+  padding-left: 1.4em;
+}
+
+.handbook-markdown li + li {
+  margin-top: 0.25em;
+}
+
+.handbook-markdown blockquote {
+  border-left: 3px solid var(--line);
+  padding-left: 12px;
+  color: var(--muted);
+}
+
+.handbook-markdown code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.1em 0.35em;
+}
+
+.handbook-markdown pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.handbook-markdown pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+.handbook-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.handbook-markdown th,
+.handbook-markdown td {
+  border: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.handbook-markdown th {
+  background: var(--bg);
+  font-weight: 600;
+}
+
+.handbook-markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.handbook-markdown hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 1.2em 0;
+}
+
+@media (max-width: 900px) {
+  .handbook-app__cols {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    overflow: auto;
+  }
+
+  .handbook-app__tree,
+  .handbook-app__list,
+  .handbook-app__editor {
+    width: auto;
+    min-height: 220px;
+    max-height: none;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .handbook-app__editor {
+    min-height: 360px;
+    border-bottom: none;
+  }
+
+  .handbook-editor__body,
+  .handbook-editor__preview {
+    min-height: 240px;
   }
 }

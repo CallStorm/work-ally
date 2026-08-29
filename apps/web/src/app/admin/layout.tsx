@@ -10,6 +10,7 @@ const nav = [
   { href: '/admin/default-agent', label: 'Agent' },
   { href: '/admin/models', label: '模型配置' },
   { href: '/admin/apps/stickies', label: '应用 · 闪签' },
+  { href: '/admin/apps/handbook', label: '应用 · 手册' },
 ];
 
 export default function AdminLayout({
