@@ -1,6 +1,5 @@
-'use client';
-import { HandbookApp } from '@/components/handbook/handbook-app';
+import { redirect } from 'next/navigation';
 
-export default function HandbookPage() {
-  return <HandbookApp />;
+export default function HandbookRedirectPage() {
+  redirect('/workbench/apps/notes');
 }

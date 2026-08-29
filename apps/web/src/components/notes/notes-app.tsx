@@ -23,7 +23,7 @@ function notesPath(selection: CategorySelection, query: string) {
   const q = query.trim();
   if (q) params.set('q', q);
   const qs = params.toString();
-  return qs ? `/apps/handbook/notes?${qs}` : '/apps/handbook/notes';
+  return qs ? `/apps/notes/notes?${qs}` : '/apps/notes/notes';
 }
 
 function noteMatchesSelection(note: HandbookNote, selection: CategorySelection) {
@@ -85,7 +85,7 @@ function pendingPatchDiffers(a: NotePatch, b: NotePatch): boolean {
   );
 }
 
-export function HandbookApp() {
+export function NotesApp() {
   const [categories, setCategories] = useState<HandbookCategory[]>([]);
   const [notes, setNotes] = useState<HandbookNote[]>([]);
   const [selection, setSelection] = useState<CategorySelection>('all');
@@ -113,7 +113,7 @@ export function HandbookApp() {
       }
       try {
         const [nextCategories, nextNotes] = await Promise.all([
-          apiFetch<HandbookCategory[]>('/apps/handbook/categories'),
+          apiFetch<HandbookCategory[]>('/apps/notes/categories'),
           apiFetch<HandbookNote[]>(notesPath(selection, debouncedQuery)),
         ]);
         if (requestId !== fetchIdRef.current) return;
@@ -122,13 +122,13 @@ export function HandbookApp() {
       } catch (err) {
         if (requestId !== fetchIdRef.current) return;
         const message =
-          err instanceof Error ? err.message : '加载手册失败';
+          err instanceof Error ? err.message : '加载笔记失败';
         if (opts?.silent) {
           setActionError(message);
           return;
         }
         if (err instanceof ApiError && err.status === 403) {
-          setLoadError(err.message || '无权使用手册应用');
+          setLoadError(err.message || '无权使用笔记应用');
         } else {
           setLoadError(message);
         }
@@ -157,7 +157,7 @@ export function HandbookApp() {
 
     try {
       const updated = await apiFetch<HandbookNote>(
-        `/apps/handbook/notes/${id}`,
+        `/apps/notes/notes/${id}`,
         { method: 'PATCH', body: JSON.stringify(body) },
       );
       if (deletingIdsRef.current.has(id)) return;
@@ -267,7 +267,7 @@ export function HandbookApp() {
       leftover.forEach((patch, id) => {
         const { body } = buildNotePatch(patch);
         if (!body) return;
-        void apiFetch(`/apps/handbook/notes/${id}`, {
+        void apiFetch(`/apps/notes/notes/${id}`, {
           method: 'PATCH',
           body: JSON.stringify(body),
         });
@@ -300,7 +300,7 @@ export function HandbookApp() {
     await drainPending();
     setActionError(null);
     try {
-      const created = await apiFetch<HandbookNote>('/apps/handbook/notes', {
+      const created = await apiFetch<HandbookNote>('/apps/notes/notes', {
         method: 'POST',
         body: JSON.stringify({
           title: extra?.title ?? '无标题',
@@ -355,7 +355,7 @@ export function HandbookApp() {
     const id = selectedNoteId;
     deletingIdsRef.current.add(id);
     try {
-      await apiFetch(`/apps/handbook/notes/${id}`, { method: 'DELETE' });
+      await apiFetch(`/apps/notes/notes/${id}`, { method: 'DELETE' });
       setNotes((prev) => prev.filter((n) => n.id !== id));
       setSelectedNoteId(null);
     } catch (err) {
@@ -367,7 +367,7 @@ export function HandbookApp() {
   async function handleCreateCategory(name: string, parentId?: string | null) {
     setActionError(null);
     try {
-      await apiFetch<HandbookCategory>('/apps/handbook/categories', {
+      await apiFetch<HandbookCategory>('/apps/notes/categories', {
         method: 'POST',
         body: JSON.stringify({
           name,
@@ -383,7 +383,7 @@ export function HandbookApp() {
   async function handleRename(id: string, name: string) {
     setActionError(null);
     try {
-      await apiFetch<HandbookCategory>(`/apps/handbook/categories/${id}`, {
+      await apiFetch<HandbookCategory>(`/apps/notes/categories/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ name }),
       });
@@ -396,7 +396,7 @@ export function HandbookApp() {
   async function handleDeleteCategory(id: string) {
     setActionError(null);
     try {
-      await apiFetch(`/apps/handbook/categories/${id}`, { method: 'DELETE' });
+      await apiFetch(`/apps/notes/categories/${id}`, { method: 'DELETE' });
       setSelectedNoteId((current) => {
         const note = notes.find((n) => n.id === current);
         return note?.categoryId === id ? null : current;

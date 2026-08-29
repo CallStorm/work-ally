@@ -27,11 +27,11 @@ export default function AppsListPage() {
       <div className="apps-list-page__grid">
         {apps.map((app) => {
           const isStickies = app.slug === 'stickies';
-          const isHandbook = app.slug === 'handbook';
+          const isNotes = app.slug === 'notes';
           const cardClass = [
             'apps-list-page__card',
             isStickies ? 'apps-list-page__card--stickies' : '',
-            isHandbook ? 'apps-list-page__card--handbook' : '',
+            isNotes ? 'apps-list-page__card--handbook' : '',
           ]
             .filter(Boolean)
             .join(' ');
@@ -45,7 +45,7 @@ export default function AppsListPage() {
                 <div className="apps-list-page__cover" aria-hidden>
                   <span className="apps-list-page__cal" />
                 </div>
-              ) : isHandbook ? (
+              ) : isNotes ? (
                 <div className="apps-list-page__cover" aria-hidden>
                   <span className="apps-list-page__book" />
                 </div>
@@ -58,8 +58,8 @@ export default function AppsListPage() {
                 {isStickies && (
                   <span className="apps-list-page__meta">日 / 周 / 月 · 提醒</span>
                 )}
-                {isHandbook && (
-                  <span className="apps-list-page__meta">分类 · Markdown · 搜索</span>
+                {isNotes && (
+                  <span className="apps-list-page__meta">分类 · Markdown · 搜索 · AI</span>
                 )}
               </div>
             </Link>
