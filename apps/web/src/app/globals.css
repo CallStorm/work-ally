@@ -2452,78 +2452,143 @@ body.is-dragging-task .task-chip {
   outline: none;
 }
 
-.handbook-editor__category {
+.handbook-editor__toolbar {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  padding: 8px 16px 0;
-  font-size: 13px;
-  color: var(--muted);
-}
-
-.handbook-editor__category-label {
-  flex-shrink: 0;
-}
-
-.handbook-editor__category-select {
-  min-width: 160px;
-  max-width: 100%;
-  padding: 4px 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--bg, transparent);
-  color: inherit;
-  font: inherit;
-  font-size: 13px;
-}
-
-.handbook-editor__tabs {
-  flex-shrink: 0;
-  display: flex;
   gap: 4px;
-  padding: 8px 16px 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 88%, var(--ink) 4%);
 }
 
-.handbook-editor__tab {
-  padding: 6px 12px;
-  border: none;
-  border-bottom: 2px solid transparent;
+.handbook-editor__tool {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: transparent;
-  color: var(--muted);
+  color: var(--ink);
   font: inherit;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.handbook-editor__tab--active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+.handbook-editor__tool:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-.handbook-editor__body,
-.handbook-editor__preview {
+.handbook-editor__tool--active {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+.handbook-editor__tool:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.handbook-editor__tool-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: var(--line);
+}
+
+.handbook-editor__canvas {
   flex: 1;
   min-height: 0;
-  width: 100%;
-  box-sizing: border-box;
+  overflow: auto;
   padding: 12px 16px;
+}
+
+.handbook-editor__canvas .tiptap {
+  outline: none;
+  min-height: 100%;
+}
+
+.handbook-editor__prose {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.handbook-editor__prose p,
+.handbook-editor__prose ul,
+.handbook-editor__prose ol,
+.handbook-editor__prose pre,
+.handbook-editor__prose blockquote {
+  margin: 0.75em 0;
+}
+
+.handbook-editor__prose h1,
+.handbook-editor__prose h2,
+.handbook-editor__prose h3 {
+  margin: 1em 0 0.4em;
+  font-family: Fraunces, Georgia, serif;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.handbook-editor__prose h1 {
+  font-size: 1.5rem;
+}
+
+.handbook-editor__prose h2 {
+  font-size: 1.25rem;
+}
+
+.handbook-editor__prose h3 {
+  font-size: 1.1rem;
+}
+
+.handbook-editor__prose ul,
+.handbook-editor__prose ol {
+  padding-left: 1.4em;
+}
+
+.handbook-editor__prose blockquote {
+  padding-left: 0.9em;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+
+.handbook-editor__prose code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+}
+
+.handbook-editor__prose pre {
+  padding: 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
   overflow: auto;
 }
 
-.handbook-editor__body {
-  border: none;
-  resize: none;
+.handbook-editor__prose pre code {
+  padding: 0;
   background: transparent;
-  color: inherit;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 14px;
-  line-height: 1.6;
 }
 
-.handbook-editor__body:focus {
-  outline: none;
+.handbook-editor__prose a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.handbook-editor__prose p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+  color: var(--muted);
 }
 
 .handbook-editor__delete {
@@ -2675,8 +2740,7 @@ body.is-dragging-task .task-chip {
     border-bottom: none;
   }
 
-  .handbook-editor__body,
-  .handbook-editor__preview {
+  .handbook-editor__canvas {
     min-height: 240px;
   }
 }

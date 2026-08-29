@@ -346,15 +346,6 @@ export function HandbookApp() {
     scheduleSave(selectedNoteId, { bodyMd });
   }
 
-  function handleChangeCategory(categoryId: string | null) {
-    if (!selectedNoteId) return;
-    setActionError(null);
-    scheduleSave(selectedNoteId, { categoryId });
-    if (selection !== 'all') {
-      setSelection(categoryId ?? 'uncategorized');
-    }
-  }
-
   async function handleDeleteNote() {
     if (!selectedNoteId) return;
     if (!confirm('确定删除该笔记？')) return;
@@ -490,10 +481,8 @@ export function HandbookApp() {
           <NoteEditor
             key={selectedNote?.id ?? 'empty'}
             note={selectedNote}
-            categories={categories}
             onChangeTitle={handleChangeTitle}
             onChangeBody={handleChangeBody}
-            onChangeCategory={handleChangeCategory}
             onDelete={handleDeleteNote}
           />
         </section>
