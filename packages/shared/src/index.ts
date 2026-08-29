@@ -148,6 +148,42 @@ export const UpdateTaskSchema = z.object({
 });
 export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
 
+export const HANDBOOK_SLUG = 'handbook';
+
+export const CreateHandbookCategorySchema = z.object({
+  name: z.string().trim().min(1).max(64),
+  parentId: z.string().cuid().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+export type CreateHandbookCategoryInput = z.infer<
+  typeof CreateHandbookCategorySchema
+>;
+
+export const UpdateHandbookCategorySchema = z.object({
+  name: z.string().trim().min(1).max(64).optional(),
+  parentId: z.string().cuid().nullable().optional(),
+  sortOrder: z.number().int().optional(),
+});
+export type UpdateHandbookCategoryInput = z.infer<
+  typeof UpdateHandbookCategorySchema
+>;
+
+export const CreateHandbookNoteSchema = z.object({
+  title: z.string().trim().min(1).max(191).optional().default('无标题'),
+  bodyMd: z.string().max(50000).optional().default(''),
+  categoryId: z.string().cuid().nullable().optional(),
+  pinned: z.boolean().optional().default(false),
+});
+export type CreateHandbookNoteInput = z.infer<typeof CreateHandbookNoteSchema>;
+
+export const UpdateHandbookNoteSchema = z.object({
+  title: z.string().trim().min(1).max(191).optional(),
+  bodyMd: z.string().max(50000).optional(),
+  categoryId: z.string().cuid().nullable().optional(),
+  pinned: z.boolean().optional(),
+});
+export type UpdateHandbookNoteInput = z.infer<typeof UpdateHandbookNoteSchema>;
+
 export const UpdateAppRegistrySchema = z.object({
   enabled: z.boolean().optional(),
   defaultModelConfigId: z.string().nullable().optional(),
