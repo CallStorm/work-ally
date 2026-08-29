@@ -6,22 +6,29 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   CreateHandbookCategorySchema,
+  CreateHandbookNoteSchema,
   UpdateHandbookCategorySchema,
+  UpdateHandbookNoteSchema,
 } from '@work-ally/shared';
 import { JwtAuthGuard } from '../../../common/jwt-auth.guard';
 import { CurrentUser, type AuthUser } from '../../../common/current-user.decorator';
 import { parseBody } from '../../../common/zod';
 import { HandbookAppGuard } from '../handbook-app.guard';
 import { HandbookCategoriesService } from './handbook-categories.service';
+import { HandbookNotesService } from './handbook-notes.service';
 
 @Controller('apps/handbook')
 @UseGuards(JwtAuthGuard, HandbookAppGuard)
 export class HandbookController {
-  constructor(private readonly categories: HandbookCategoriesService) {}
+  constructor(
+    private readonly categories: HandbookCategoriesService,
+    private readonly notes: HandbookNotesService,
+  ) {}
 
   @Get('categories')
   listCategories(@CurrentUser() user: AuthUser) {
@@ -52,5 +59,38 @@ export class HandbookController {
   @Delete('categories/:id')
   deleteCategory(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.categories.remove(user, id);
+  }
+
+  @Get('notes')
+  listNotes(
+    @CurrentUser() user: AuthUser,
+    @Query('categoryId') categoryId?: string,
+    @Query('q') q?: string,
+  ) {
+    return this.notes.list(user, { categoryId, q });
+  }
+
+  @Post('notes')
+  createNote(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    return this.notes.create(user, parseBody(CreateHandbookNoteSchema, body));
+  }
+
+  @Get('notes/:id')
+  getNote(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.notes.get(user, id);
+  }
+
+  @Patch('notes/:id')
+  updateNote(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.notes.update(user, id, parseBody(UpdateHandbookNoteSchema, body));
+  }
+
+  @Delete('notes/:id')
+  deleteNote(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.notes.remove(user, id);
   }
 }

@@ -7,6 +7,7 @@ import { AdminAppsController } from './admin-apps.controller';
 import { HandbookAppGuard } from './handbook-app.guard';
 import { HandbookController } from './handbook/handbook.controller';
 import { HandbookCategoriesService } from './handbook/handbook-categories.service';
+import { HandbookNotesService } from './handbook/handbook-notes.service';
 import { StickiesAppGuard } from './stickies-app.guard';
 import { TasksController } from './tasks/tasks.controller';
 import { TasksService } from './tasks/tasks.service';
@@ -26,6 +27,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     StickiesAppGuard,
     HandbookAppGuard,
     HandbookCategoriesService,
+    HandbookNotesService,
     TasksService,
     TaskNotificationsService,
     TaskReminderScheduler,
