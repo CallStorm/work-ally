@@ -158,6 +158,42 @@ export class NotesController {
 
 
 
+  @Get('notes/:id/ai/messages')
+
+  listAiMessages(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+
+    return this.notesAi.listMessages(user, id);
+
+  }
+
+
+
+  @Post('notes/:id/ai/messages')
+
+  postAiMessage(
+
+    @CurrentUser() user: AuthUser,
+
+    @Param('id') id: string,
+
+    @Body() body: unknown,
+
+  ) {
+
+    return this.notesAi.postMessage(
+
+      user,
+
+      id,
+
+      parseBody(CreateNotesAiMessageSchema, body),
+
+    );
+
+  }
+
+
+
   @Get('notes/:id')
 
   getNote(@CurrentUser() user: AuthUser, @Param('id') id: string) {
@@ -191,42 +227,6 @@ export class NotesController {
   deleteNote(@CurrentUser() user: AuthUser, @Param('id') id: string) {
 
     return this.notes.remove(user, id);
-
-  }
-
-
-
-  @Get(':id/ai/messages')
-
-  listAiMessages(@CurrentUser() user: AuthUser, @Param('id') id: string) {
-
-    return this.notesAi.listMessages(user, id);
-
-  }
-
-
-
-  @Post(':id/ai/messages')
-
-  postAiMessage(
-
-    @CurrentUser() user: AuthUser,
-
-    @Param('id') id: string,
-
-    @Body() body: unknown,
-
-  ) {
-
-    return this.notesAi.postMessage(
-
-      user,
-
-      id,
-
-      parseBody(CreateNotesAiMessageSchema, body),
-
-    );
 
   }
 
