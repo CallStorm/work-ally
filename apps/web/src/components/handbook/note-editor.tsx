@@ -3,21 +3,46 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { HandbookNote } from './types';
+import type { HandbookCategory, HandbookNote } from './types';
 
 export type NoteEditorProps = {
   note: HandbookNote | null;
+  categories: HandbookCategory[];
   onChangeTitle: (title: string) => void;
   onChangeBody: (bodyMd: string) => void;
+  onChangeCategory: (categoryId: string | null) => void;
   onDelete: () => void | Promise<void>;
 };
 
 type EditorMode = 'edit' | 'preview';
 
+function categoryOptions(categories: HandbookCategory[]) {
+  const sorted = [...categories].sort(
+    (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh'),
+  );
+  const childrenOf = (id: string) =>
+    sorted.filter((c) => c.parentId === id);
+  const roots = sorted.filter((c) => c.parentId == null);
+  const options: { id: string; label: string }[] = [];
+  for (const root of roots) {
+    options.push({ id: root.id, label: root.name });
+    for (const child of childrenOf(root.id)) {
+      options.push({ id: child.id, label: `${root.name} / ${child.name}` });
+    }
+  }
+  const seen = new Set(options.map((o) => o.id));
+  for (const c of sorted) {
+    if (!seen.has(c.id)) options.push({ id: c.id, label: c.name });
+  }
+  return options;
+}
+
 export function NoteEditor({
   note,
+  categories,
   onChangeTitle,
   onChangeBody,
+  onChangeCategory,
   onDelete,
 }: NoteEditorProps) {
   const [mode, setMode] = useState<EditorMode>('edit');
@@ -38,6 +63,22 @@ export function NoteEditor({
         placeholder="无标题"
         maxLength={191}
       />
+      <label className="handbook-editor__category">
+        <span className="handbook-editor__category-label">分类</span>
+        <select
+          className="handbook-editor__category-select"
+          value={note.categoryId ?? ''}
+          onChange={(e) => onChangeCategory(e.target.value || null)}
+          aria-label="笔记分类"
+        >
+          <option value="">未分类</option>
+          {categoryOptions(categories).map((opt) => (
+            <option key={opt.id} value={opt.id}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
       <div className="handbook-editor__tabs" role="tablist" aria-label="编辑或预览">
         <button
           type="button"

@@ -2452,6 +2452,32 @@ body.is-dragging-task .task-chip {
   outline: none;
 }
 
+.handbook-editor__category {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.handbook-editor__category-label {
+  flex-shrink: 0;
+}
+
+.handbook-editor__category-select {
+  min-width: 160px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg, transparent);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
 .handbook-editor__tabs {
   flex-shrink: 0;
   display: flex;

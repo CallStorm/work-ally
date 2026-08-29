@@ -12,6 +12,7 @@ import type {
 } from './types';
 
 const AUTOSAVE_MS = 500;
+const SEARCH_DEBOUNCE_MS = 300;
 const BODY_MD_MAX = 50000;
 
 const SAMPLE_TITLE = '示例：发布前检查';
@@ -23,7 +24,7 @@ const SAMPLE_BODY = `# 示例：发布前检查
 4. 冒烟验证
 `;
 
-type NotePatch = { title?: string; bodyMd?: string };
+type NotePatch = { title?: string; bodyMd?: string; categoryId?: string | null };
 
 function notesPath(selection: CategorySelection, query: string) {
   const params = new URLSearchParams();
@@ -59,23 +60,38 @@ function buildNotePatch(patch: NotePatch): {
     }
     body.bodyMd = patch.bodyMd;
   }
+  if (patch.categoryId !== undefined) {
+    body.categoryId = patch.categoryId;
+  }
   return { body: Object.keys(body).length > 0 ? body : null, error: null };
 }
 
 function applyPending(
   notes: HandbookNote[],
-  pending: { id: string; patch: NotePatch } | null,
+  pending: Map<string, NotePatch>,
 ) {
-  if (!pending) return notes;
-  return notes.map((n) =>
-    n.id === pending.id ? { ...n, ...pending.patch } : n,
-  );
+  if (pending.size === 0) return notes;
+  return notes.map((n) => {
+    const patch = pending.get(n.id);
+    return patch ? { ...n, ...patch } : n;
+  });
+}
+
+function mergePending(
+  pending: Map<string, NotePatch>,
+  id: string,
+  patch: NotePatch,
+) {
+  const prev = pending.get(id);
+  pending.set(id, prev ? { ...prev, ...patch } : patch);
 }
 
 function pendingPatchDiffers(a: NotePatch, b: NotePatch): boolean {
-  if (a.title !== b.title) return true;
-  if (a.bodyMd !== b.bodyMd) return true;
-  return false;
+  return (
+    a.title !== b.title ||
+    a.bodyMd !== b.bodyMd ||
+    a.categoryId !== b.categoryId
+  );
 }
 
 export function HandbookApp() {
@@ -84,20 +100,21 @@ export function HandbookApp() {
   const [selection, setSelection] = useState<CategorySelection>('all');
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const fetchIdRef = useRef(0);
   const hasLoadedRef = useRef(false);
-  const pendingRef = useRef<{ id: string; patch: NotePatch } | null>(null);
+  const pendingRef = useRef(new Map<string, NotePatch>());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deletingIdsRef = useRef(new Set<string>());
   const inFlightSaveRef = useRef<Promise<void> | null>(null);
-  const flushSaveRef = useRef<() => Promise<void>>(async () => {});
+  const drainPendingRef = useRef<() => Promise<void>>(async () => {});
 
   const loadData = useCallback(
     async (opts?: { silent?: boolean }) => {
-      await flushSaveRef.current();
+      await drainPendingRef.current();
       const requestId = ++fetchIdRef.current;
       if (!opts?.silent) {
         setLoading(true);
@@ -106,7 +123,7 @@ export function HandbookApp() {
       try {
         const [nextCategories, nextNotes] = await Promise.all([
           apiFetch<HandbookCategory[]>('/apps/handbook/categories'),
-          apiFetch<HandbookNote[]>(notesPath(selection, query)),
+          apiFetch<HandbookNote[]>(notesPath(selection, debouncedQuery)),
         ]);
         if (requestId !== fetchIdRef.current) return;
         setCategories(nextCategories);
@@ -130,67 +147,68 @@ export function HandbookApp() {
         }
       }
     },
-    [selection, query],
+    [selection, debouncedQuery],
   );
 
-  function requeuePending(failed: { id: string; patch: NotePatch }) {
-    const current = pendingRef.current;
-    if (!current) {
-      pendingRef.current = failed;
+  function requeuePending(id: string, failed: NotePatch) {
+    const current = pendingRef.current.get(id);
+    pendingRef.current.set(id, current ? { ...failed, ...current } : failed);
+  }
+
+  async function flushOne(id: string, patch: NotePatch): Promise<void> {
+    const { body, error } = buildNotePatch(patch);
+    if (error) {
+      requeuePending(id, patch);
+      setActionError(error);
       return;
     }
-    if (current.id === failed.id) {
-      pendingRef.current = {
-        id: failed.id,
-        patch: { ...failed.patch, ...current.patch },
-      };
+    if (!body) return;
+
+    try {
+      const updated = await apiFetch<HandbookNote>(
+        `/apps/handbook/notes/${id}`,
+        { method: 'PATCH', body: JSON.stringify(body) },
+      );
+      if (deletingIdsRef.current.has(id)) return;
+      setNotes((prev) =>
+        prev.map((n) => {
+          if (n.id !== updated.id) return n;
+          const later = pendingRef.current.get(n.id);
+          if (later) {
+            return { ...n, ...later, updatedAt: updated.updatedAt };
+          }
+          return updated;
+        }),
+      );
+    } catch (err) {
+      if (deletingIdsRef.current.has(id)) return;
+      requeuePending(id, patch);
+      setActionError(err instanceof Error ? err.message : '保存失败');
     }
   }
 
   function flushSave(): Promise<void> {
     if (inFlightSaveRef.current) return inFlightSaveRef.current;
 
-    let savedId: string | undefined;
-    let savedPatch: NotePatch | undefined;
-
+    const attempted = new Map<string, NotePatch>();
     const work = (async () => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
-      const pending = pendingRef.current;
-      if (!pending) return;
-      pendingRef.current = null;
-      savedId = pending.id;
-      savedPatch = pending.patch;
-
-      const { body, error } = buildNotePatch(pending.patch);
-      if (error) {
-        requeuePending(pending);
-        setActionError(error);
-        return;
-      }
-      if (!body) return;
-
-      try {
-        const updated = await apiFetch<HandbookNote>(
-          `/apps/handbook/notes/${pending.id}`,
-          { method: 'PATCH', body: JSON.stringify(body) },
-        );
-        if (deletingIdsRef.current.has(pending.id)) return;
-        setNotes((prev) =>
-          prev.map((n) => {
-            if (n.id !== updated.id) return n;
-            if (pendingRef.current?.id === n.id) {
-              return { ...n, updatedAt: updated.updatedAt };
-            }
-            return updated;
-          }),
-        );
-      } catch (err) {
-        if (deletingIdsRef.current.has(pending.id)) return;
-        requeuePending(pending);
-        setActionError(err instanceof Error ? err.message : '保存失败');
+      let progressed = true;
+      while (progressed) {
+        progressed = false;
+        for (const id of [...pendingRef.current.keys()]) {
+          const patch = pendingRef.current.get(id);
+          if (!patch) continue;
+          const prev = attempted.get(id);
+          if (prev && !pendingPatchDiffers(prev, patch)) continue;
+          pendingRef.current.delete(id);
+          attempted.set(id, patch);
+          await flushOne(id, patch);
+          progressed = true;
+        }
       }
     })();
 
@@ -199,37 +217,47 @@ export function HandbookApp() {
       if (inFlightSaveRef.current === inflight) {
         inFlightSaveRef.current = null;
       }
-      const next = pendingRef.current;
-      if (
-        next &&
-        savedId !== undefined &&
-        savedPatch !== undefined &&
-        (next.id !== savedId || pendingPatchDiffers(next.patch, savedPatch))
-      ) {
-        void flushSave();
+      for (const [id, patch] of pendingRef.current) {
+        const prev = attempted.get(id);
+        if (!prev || pendingPatchDiffers(prev, patch)) {
+          void flushSave();
+          break;
+        }
       }
     });
     inFlightSaveRef.current = inflight;
     return inflight;
   }
 
-  flushSaveRef.current = flushSave;
+  async function drainPending(): Promise<void> {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    await flushSave();
+    while (inFlightSaveRef.current) {
+      await inFlightSaveRef.current;
+    }
+  }
+
+  drainPendingRef.current = drainPending;
 
   function scheduleSave(id: string, patch: NotePatch) {
     setNotes((prev) =>
       prev.map((n) => (n.id === id ? { ...n, ...patch } : n)),
     );
-    const prev = pendingRef.current;
-    pendingRef.current =
-      prev && prev.id === id
-        ? { id, patch: { ...prev.patch, ...patch } }
-        : { id, patch };
+    mergePending(pendingRef.current, id, patch);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       timerRef.current = null;
       void flushSave();
     }, AUTOSAVE_MS);
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     void loadData({ silent: hasLoadedRef.current }).then(() => {
@@ -243,14 +271,15 @@ export function HandbookApp() {
         clearTimeout(timerRef.current);
         timerRef.current = null;
       }
-      const pending = pendingRef.current;
-      pendingRef.current = null;
-      if (!pending) return;
-      const { body } = buildNotePatch(pending.patch);
-      if (!body) return;
-      void apiFetch(`/apps/handbook/notes/${pending.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(body),
+      const leftover = pendingRef.current;
+      pendingRef.current = new Map();
+      leftover.forEach((patch, id) => {
+        const { body } = buildNotePatch(patch);
+        if (!body) return;
+        void apiFetch(`/apps/handbook/notes/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        });
       });
     };
   }, []);
@@ -262,8 +291,8 @@ export function HandbookApp() {
     }
   }, [notes, selectedNoteId]);
 
-  function handleSelect(next: CategorySelection) {
-    void flushSave();
+  async function handleSelect(next: CategorySelection) {
+    await drainPending();
     setActionError(null);
     setSelection(next);
     setSelectedNoteId((current) => {
@@ -277,7 +306,7 @@ export function HandbookApp() {
   async function handleCreate(
     extra?: { title?: string; bodyMd?: string },
   ) {
-    await flushSave();
+    await drainPending();
     setActionError(null);
     try {
       const created = await apiFetch<HandbookNote>('/apps/handbook/notes', {
@@ -299,8 +328,9 @@ export function HandbookApp() {
     }
   }
 
-  function handleSelectNote(id: string) {
-    if (id !== selectedNoteId) void flushSave();
+  async function handleSelectNote(id: string) {
+    if (id === selectedNoteId) return;
+    await drainPending();
     setSelectedNoteId(id);
   }
 
@@ -316,6 +346,15 @@ export function HandbookApp() {
     scheduleSave(selectedNoteId, { bodyMd });
   }
 
+  function handleChangeCategory(categoryId: string | null) {
+    if (!selectedNoteId) return;
+    setActionError(null);
+    scheduleSave(selectedNoteId, { categoryId });
+    if (selection !== 'all') {
+      setSelection(categoryId ?? 'uncategorized');
+    }
+  }
+
   async function handleDeleteNote() {
     if (!selectedNoteId) return;
     if (!confirm('确定删除该笔记？')) return;
@@ -323,7 +362,13 @@ export function HandbookApp() {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    pendingRef.current = null;
+    pendingRef.current.delete(selectedNoteId);
+    if (pendingRef.current.size > 0) {
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null;
+        void flushSave();
+      }, AUTOSAVE_MS);
+    }
     setActionError(null);
     const id = selectedNoteId;
     deletingIdsRef.current.add(id);
@@ -406,7 +451,6 @@ export function HandbookApp() {
           className="handbook-app__search-input"
           value={query}
           onChange={(e) => {
-            void flushSave();
             setQuery(e.target.value);
           }}
           placeholder="搜索标题和正文"
@@ -418,7 +462,7 @@ export function HandbookApp() {
           <CategoryTree
             categories={categories}
             selection={selection}
-            onSelect={handleSelect}
+            onSelect={(next) => void handleSelect(next)}
             onCreate={handleCreateCategory}
             onRename={handleRename}
             onDelete={handleDeleteCategory}
@@ -429,7 +473,7 @@ export function HandbookApp() {
             notes={notes}
             selectedNoteId={selectedNoteId}
             query={query}
-            onSelect={handleSelectNote}
+            onSelect={(id) => void handleSelectNote(id)}
             onCreate={() => handleCreate()}
             onCreateSample={
               notes.length === 0 && !query.trim()
@@ -446,8 +490,10 @@ export function HandbookApp() {
           <NoteEditor
             key={selectedNote?.id ?? 'empty'}
             note={selectedNote}
+            categories={categories}
             onChangeTitle={handleChangeTitle}
             onChangeBody={handleChangeBody}
+            onChangeCategory={handleChangeCategory}
             onDelete={handleDeleteNote}
           />
         </section>
