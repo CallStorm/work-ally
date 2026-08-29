@@ -148,7 +148,21 @@ export const UpdateTaskSchema = z.object({
 });
 export type UpdateTaskInput = z.infer<typeof UpdateTaskSchema>;
 
-export const HANDBOOK_SLUG = 'handbook';
+export const NOTES_SLUG = 'notes';
+/** @deprecated use NOTES_SLUG */
+export const HANDBOOK_SLUG = NOTES_SLUG;
+
+export const NotesAiActionSchema = z.enum(['format', 'enrich', 'custom']);
+export type NotesAiAction = z.infer<typeof NotesAiActionSchema>;
+
+export const CreateNotesAiMessageSchema = z.object({
+  prompt: z.string().trim().min(1).max(4000),
+  action: NotesAiActionSchema.optional().default('custom'),
+  /** Current editor markdown snapshot from client */
+  bodyMd: z.string().max(50000),
+  title: z.string().trim().max(191).optional().default(''),
+});
+export type CreateNotesAiMessageInput = z.infer<typeof CreateNotesAiMessageSchema>;
 
 export const CreateHandbookCategorySchema = z.object({
   name: z.string().trim().min(1).max(64),
