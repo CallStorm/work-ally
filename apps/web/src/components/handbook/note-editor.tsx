@@ -36,6 +36,7 @@ export function NoteEditor({
         onChange={(e) => onChangeTitle(e.target.value)}
         aria-label="笔记标题"
         placeholder="无标题"
+        maxLength={191}
       />
       <div className="handbook-editor__tabs" role="tablist" aria-label="编辑或预览">
         <button
@@ -72,6 +73,7 @@ export function NoteEditor({
           onChange={(e) => onChangeBody(e.target.value)}
           aria-label="笔记正文"
           placeholder="使用 Markdown 编写…"
+          maxLength={50000}
         />
       ) : (
         <div className="handbook-editor__preview handbook-markdown">

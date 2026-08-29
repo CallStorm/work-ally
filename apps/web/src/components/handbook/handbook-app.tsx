@@ -51,8 +51,7 @@ function buildNotePatch(patch: NotePatch): {
 } {
   const body: NotePatch = {};
   if (patch.title !== undefined) {
-    const title = patch.title.trim();
-    if (title) body.title = title;
+    body.title = patch.title.trim() || '无标题';
   }
   if (patch.bodyMd !== undefined) {
     if (patch.bodyMd.length > BODY_MD_MAX) {
@@ -61,6 +60,16 @@ function buildNotePatch(patch: NotePatch): {
     body.bodyMd = patch.bodyMd;
   }
   return { body: Object.keys(body).length > 0 ? body : null, error: null };
+}
+
+function applyPending(
+  notes: HandbookNote[],
+  pending: { id: string; patch: NotePatch } | null,
+) {
+  if (!pending) return notes;
+  return notes.map((n) =>
+    n.id === pending.id ? { ...n, ...pending.patch } : n,
+  );
 }
 
 export function HandbookApp() {
@@ -76,9 +85,12 @@ export function HandbookApp() {
   const hasLoadedRef = useRef(false);
   const pendingRef = useRef<{ id: string; patch: NotePatch } | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deletingIdsRef = useRef(new Set<string>());
+  const flushSaveRef = useRef<() => Promise<void>>(async () => {});
 
   const loadData = useCallback(
     async (opts?: { silent?: boolean }) => {
+      await flushSaveRef.current();
       const requestId = ++fetchIdRef.current;
       if (!opts?.silent) {
         setLoading(true);
@@ -91,7 +103,7 @@ export function HandbookApp() {
         ]);
         if (requestId !== fetchIdRef.current) return;
         setCategories(nextCategories);
-        setNotes(nextNotes);
+        setNotes(applyPending(nextNotes, pendingRef.current));
       } catch (err) {
         if (requestId !== fetchIdRef.current) return;
         const message =
@@ -135,6 +147,7 @@ export function HandbookApp() {
         `/apps/handbook/notes/${pending.id}`,
         { method: 'PATCH', body: JSON.stringify(body) },
       );
+      if (deletingIdsRef.current.has(pending.id)) return;
       setNotes((prev) =>
         prev.map((n) => {
           if (n.id !== updated.id) return n;
@@ -145,9 +158,12 @@ export function HandbookApp() {
         }),
       );
     } catch (err) {
+      if (deletingIdsRef.current.has(pending.id)) return;
       setActionError(err instanceof Error ? err.message : '保存失败');
     }
   }
+
+  flushSaveRef.current = flushSave;
 
   function scheduleSave(id: string, patch: NotePatch) {
     setNotes((prev) =>
@@ -260,11 +276,13 @@ export function HandbookApp() {
     pendingRef.current = null;
     setActionError(null);
     const id = selectedNoteId;
+    deletingIdsRef.current.add(id);
     try {
       await apiFetch(`/apps/handbook/notes/${id}`, { method: 'DELETE' });
       setNotes((prev) => prev.filter((n) => n.id !== id));
       setSelectedNoteId(null);
     } catch (err) {
+      deletingIdsRef.current.delete(id);
       setActionError(err instanceof Error ? err.message : '删除笔记失败');
     }
   }
