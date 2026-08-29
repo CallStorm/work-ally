@@ -10,8 +10,13 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.69.0",
+    "@tiptap/extension-color": "^3.30.5",
+    "@tiptap/extension-highlight": "^3.30.5",
+    "@tiptap/extension-horizontal-rule": "^3.30.5",
     "@tiptap/extension-link": "^3.30.5",
     "@tiptap/extension-placeholder": "^3.30.5",
+    "@tiptap/extension-text-align": "^3.30.5",
+    "@tiptap/extension-text-style": "^3.30.5",
     "@tiptap/extension-underline": "^3.30.5",
     "@tiptap/pm": "^3.30.5",
     "@tiptap/react": "^3.30.5",

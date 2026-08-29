@@ -219,6 +219,17 @@ export function CategoryTree({
 
   return (
     <nav className="handbook-tree" ref={rootRef} aria-label="分类">
+      <div className="handbook-tree__head">
+        <span className="handbook-tree__head-title">分类</span>
+        <button
+          type="button"
+          className="handbook-tree__head-add"
+          aria-label="新建分类"
+          onClick={() => startCreate(null)}
+        >
+          +
+        </button>
+      </div>
       <ul className="handbook-tree__list">
         <li>
           <button
@@ -270,15 +281,7 @@ export function CategoryTree({
           placeholder="分类名称"
           ariaLabel="新建分类"
         />
-      ) : (
-        <button
-          type="button"
-          className="handbook-tree__add"
-          onClick={() => startCreate(null)}
-        >
-          + 分类
-        </button>
-      )}
+      ) : null}
     </nav>
   );
 }
