@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { normalizePhone, STICKIES_SLUG } from '@work-ally/shared';
+import { HANDBOOK_SLUG, normalizePhone, STICKIES_SLUG } from '@work-ally/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../../common/current-user.decorator';
 
@@ -85,6 +85,17 @@ export class AuthService {
           slug: STICKIES_SLUG,
           name: '闪签',
           description: '日历任务：日/周/月视图、优先级、提醒与拖拽改期',
+          ownerUserId: user.id,
+          visibility: 'tenant',
+          enabled: true,
+        },
+      });
+      await tx.appRegistry.create({
+        data: {
+          tenantId: tenant.id,
+          slug: HANDBOOK_SLUG,
+          name: '手册',
+          description: '个人工作手册：分类、Markdown 流程笔记与快速搜索',
           ownerUserId: user.id,
           visibility: 'tenant',
           enabled: true,

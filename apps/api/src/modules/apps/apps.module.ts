@@ -4,6 +4,7 @@ import { AclModule } from '../acl/acl.module';
 import { AppRegistryService } from './app-registry.service';
 import { AppsController } from './apps.controller';
 import { AdminAppsController } from './admin-apps.controller';
+import { HandbookAppGuard } from './handbook-app.guard';
 import { StickiesAppGuard } from './stickies-app.guard';
 import { TasksController } from './tasks/tasks.controller';
 import { TasksService } from './tasks/tasks.service';
@@ -16,6 +17,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
   providers: [
     AppRegistryService,
     StickiesAppGuard,
+    HandbookAppGuard,
     TasksService,
     TaskNotificationsService,
     TaskReminderScheduler,
