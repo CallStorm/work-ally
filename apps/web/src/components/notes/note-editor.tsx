@@ -37,6 +37,8 @@ export type NoteEditorProps = {
   onChangeTitle: (title: string) => void;
   onChangeBody: (bodyMd: string) => void;
   onDelete: () => void | Promise<void>;
+  onOpenAi?: () => void;
+  aiOpen?: boolean;
 };
 
 function Tool(props: {
@@ -133,6 +135,8 @@ export function NoteEditor({
   onChangeTitle,
   onChangeBody,
   onDelete,
+  onOpenAi,
+  aiOpen,
 }: NoteEditorProps) {
   const [insertOpen, setInsertOpen] = useState(false);
   const [highlightOpen, setHighlightOpen] = useState(false);
@@ -484,6 +488,16 @@ export function NoteEditor({
           }
         >
           R
+        </Tool>
+
+        <Tool
+          title="AI 改稿"
+          wide
+          active={aiOpen}
+          disabled={!note || !onOpenAi}
+          onClick={() => onOpenAi?.()}
+        >
+          AI
         </Tool>
 
         <div className="hb-toolbar__spacer" />

@@ -5,6 +5,7 @@ import { ApiError, apiFetch } from '@/lib/api';
 import { CategoryTree } from './category-tree';
 import { NoteEditor } from './note-editor';
 import { NoteList } from './note-list';
+import { NotesAiPanel } from './notes-ai-panel';
 import type {
   CategorySelection,
   HandbookCategory,
@@ -95,6 +96,8 @@ export function NotesApp() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [previousBodyMd, setPreviousBodyMd] = useState<string | null>(null);
   const fetchIdRef = useRef(0);
   const hasLoadedRef = useRef(false);
   const pendingRef = useRef(new Map<string, NotePatch>());
@@ -319,6 +322,10 @@ export function NotesApp() {
     }
   }
 
+  useEffect(() => {
+    setPreviousBodyMd(null);
+  }, [selectedNoteId]);
+
   async function handleSelectNote(id: string) {
     if (id === selectedNoteId) return;
     await drainPending();
@@ -335,6 +342,18 @@ export function NotesApp() {
     if (!selectedNoteId) return;
     setActionError(null);
     scheduleSave(selectedNoteId, { bodyMd });
+  }
+
+  function handleApplyAi(draftMd: string) {
+    if (!selectedNote) return;
+    setPreviousBodyMd(selectedNote.bodyMd);
+    handleChangeBody(draftMd);
+  }
+
+  function handleRestoreAi() {
+    if (previousBodyMd == null) return;
+    handleChangeBody(previousBodyMd);
+    setPreviousBodyMd(null);
   }
 
   async function handleDeleteNote() {
@@ -439,7 +458,14 @@ export function NotesApp() {
           aria-label="搜索笔记"
         />
       </div>
-      <div className="handbook-app__cols">
+      <div
+        className={[
+          'handbook-app__cols',
+          aiOpen && selectedNote ? 'handbook-app__cols--ai-open' : null,
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <aside className="handbook-app__tree">
           <CategoryTree
             categories={categories}
@@ -466,8 +492,22 @@ export function NotesApp() {
             onChangeTitle={handleChangeTitle}
             onChangeBody={handleChangeBody}
             onDelete={handleDeleteNote}
+            aiOpen={aiOpen}
+            onOpenAi={() => setAiOpen(true)}
           />
         </section>
+        {aiOpen && selectedNote ? (
+          <NotesAiPanel
+            noteId={selectedNote.id}
+            title={selectedNote.title}
+            bodyMd={selectedNote.bodyMd}
+            open={aiOpen}
+            onClose={() => setAiOpen(false)}
+            onApply={handleApplyAi}
+            canRestore={previousBodyMd != null}
+            onRestore={handleRestoreAi}
+          />
+        ) : null}
       </div>
     </div>
   );

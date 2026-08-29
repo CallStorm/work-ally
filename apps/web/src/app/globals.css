@@ -2189,6 +2189,311 @@ body.is-dragging-task .task-chip {
   flex-direction: column;
 }
 
+.handbook-app__cols--ai-open {
+  grid-template-columns: 200px 260px minmax(0, 1fr) 340px;
+}
+
+/* Notes AI side panel */
+.notes-ai {
+  --notes-ai-line: var(--line, #e5e7eb);
+  --notes-ai-muted: var(--muted, #8b95a1);
+  --notes-ai-mint: #e8f6ef;
+  --notes-ai-mint-strong: #d5eee3;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 340px;
+  border-left: 1px solid var(--notes-ai-line);
+  background: #fbfcfd;
+}
+
+.notes-ai__header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--notes-ai-line);
+}
+
+.notes-ai__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink, #1f2933);
+}
+
+.notes-ai__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--notes-ai-muted);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.notes-ai__close:hover {
+  background: #eef2f6;
+  color: var(--ink, #1f2933);
+}
+
+.notes-ai__actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--notes-ai-line);
+}
+
+.notes-ai__quick {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--notes-ai-line);
+  border-radius: 8px;
+  background: #fff;
+  color: #4b5563;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.notes-ai__quick:hover:not(:disabled) {
+  background: #eef2f6;
+  border-color: #d1d5db;
+}
+
+.notes-ai__quick:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notes-ai__error {
+  flex-shrink: 0;
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.notes-ai__messages {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.notes-ai__empty {
+  color: var(--notes-ai-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  padding: 16px 8px;
+}
+
+.notes-ai__msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.notes-ai__msg-role {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--notes-ai-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.notes-ai__msg-body {
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notes-ai__msg--user .notes-ai__msg-body {
+  background: #fff;
+  border: 1px solid var(--notes-ai-line);
+  color: var(--ink, #1f2933);
+}
+
+.notes-ai__msg--assistant .notes-ai__msg-body {
+  background: var(--notes-ai-mint);
+  border: 1px solid var(--notes-ai-mint-strong);
+  color: #1a3d32;
+}
+
+.notes-ai__msg--pending .notes-ai__msg-body {
+  color: var(--notes-ai-muted);
+  font-style: italic;
+}
+
+.notes-ai__draft {
+  margin-top: 2px;
+}
+
+.notes-ai__draft-toggle {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #1a6b4f;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.notes-ai__draft-preview {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  max-height: 160px;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid var(--notes-ai-line);
+  background: #fff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.notes-ai__composer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--notes-ai-line);
+  background: #fff;
+}
+
+.notes-ai__input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--notes-ai-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink, #1f2933);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+  min-height: 52px;
+}
+
+.notes-ai__input:focus {
+  outline: 2px solid var(--accent-soft, #e8f6ef);
+  border-color: var(--accent, #1a6b4f);
+}
+
+.notes-ai__input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.notes-ai__send {
+  align-self: flex-end;
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent, #1a6b4f);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.notes-ai__send:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.notes-ai__send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notes-ai__footer {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--notes-ai-line);
+  background: #fbfcfd;
+}
+
+.notes-ai__apply,
+.notes-ai__restore {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.notes-ai__apply {
+  border: none;
+  background: var(--accent, #1a6b4f);
+  color: #fff;
+}
+
+.notes-ai__apply:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.notes-ai__apply:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notes-ai__restore {
+  border: 1px solid var(--notes-ai-line);
+  background: #fff;
+  color: #4b5563;
+}
+
+.notes-ai__restore:hover:not(:disabled) {
+  background: #eef2f6;
+}
+
+.notes-ai__restore:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.notes-ai__hint {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 12px 10px;
+  font-size: 12px;
+  color: var(--notes-ai-muted);
+  text-align: center;
+}
+
 .handbook-tree__list,
 .handbook-tree__children {
   list-style: none;
@@ -2906,9 +3211,14 @@ body.is-dragging-task .task-chip {
     overflow: auto;
   }
 
+  .handbook-app__cols--ai-open {
+    grid-template-columns: 1fr;
+  }
+
   .handbook-app__tree,
   .handbook-app__list,
-  .handbook-app__editor {
+  .handbook-app__editor,
+  .notes-ai {
     width: auto;
     min-height: 220px;
     max-height: none;
@@ -2919,6 +3229,13 @@ body.is-dragging-task .task-chip {
   .handbook-app__editor {
     min-height: 360px;
     border-bottom: none;
+  }
+
+  .notes-ai {
+    width: auto;
+    min-height: 280px;
+    border-left: none;
+    border-top: 1px solid var(--line);
   }
 
   .handbook-editor__canvas {
