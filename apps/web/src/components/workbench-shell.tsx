@@ -12,6 +12,7 @@ const SIDEBAR_KEY = 'workbench.sidebarCollapsed';
 const THEME_KEY = 'workbench.theme';
 const HISTORY_PREVIEW = 5;
 const assetPaths = ['/workbench/experts', '/workbench/skills', '/workbench/connectors'];
+const appPaths = ['/workbench/apps'];
 
 type NavItem = {
   href: string;
@@ -27,6 +28,16 @@ const navItems: NavItem[] = [
     label: '新建任务',
     icon: <NavIconNewTask />,
     active: (pathname) => pathname === '/workbench',
+  },
+  {
+    href: '/workbench/apps',
+    label: '应用',
+    shortLabel: '应用',
+    icon: <NavIconApps />,
+    active: (pathname) =>
+      appPaths.some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+      ),
   },
   {
     href: '/workbench/experts',
@@ -512,6 +523,17 @@ function NavIconNewTask() {
         strokeLinejoin="round"
       />
       <path d="M12 8v4M10 10h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function NavIconApps() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="4" y="4" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="13" y="4" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="4" y="13" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <rect x="13" y="13" width="7" height="7" rx="2" stroke="currentColor" strokeWidth="1.6" />
     </svg>
   );
 }
