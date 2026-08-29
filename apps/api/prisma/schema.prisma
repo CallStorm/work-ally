@@ -105,6 +105,8 @@ model Tenant {
   appRegistry       AppRegistry[]
   tasks             Task[]
   taskNotifications TaskNotification[]
+  handbookCategories HandbookCategory[]
+  handbookNotes      HandbookNote[]
 
   @@map("tenants")
 }
@@ -569,4 +571,40 @@ model TaskNotification {
 
   @@index([tenantId, userId, read, firedAt])
   @@map("task_notifications")
+}
+
+model HandbookCategory {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String   @map("user_id")
+  name      String   @db.VarChar(64)
+  parentId  String?  @map("parent_id")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  notes  HandbookNote[]
+
+  @@index([tenantId, userId, parentId])
+  @@map("handbook_categories")
+}
+
+model HandbookNote {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  userId     String   @map("user_id")
+  categoryId String?  @map("category_id")
+  title      String   @db.VarChar(191)
+  bodyMd     String   @default("") @map("body_md") @db.Text
+  pinned     Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category HandbookCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, userId, categoryId])
+  @@index([tenantId, userId, updatedAt])
+  @@map("handbook_notes")
 }
