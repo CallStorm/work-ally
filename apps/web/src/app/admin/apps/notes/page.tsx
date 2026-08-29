@@ -17,10 +17,18 @@ type AppConfig = {
   entries: Array<{ principalType: string; principalId: string }>;
 };
 
+type ModelRow = {
+  id: string;
+  modelId: string;
+  displayName: string;
+  enabled: boolean;
+};
+
 export default function AdminNotesPage() {
   const { auth, ready } = useAuth();
   const router = useRouter();
   const [app, setApp] = useState<AppConfig | null>(null);
+  const [models, setModels] = useState<ModelRow[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -32,10 +40,15 @@ export default function AdminNotesPage() {
   useEffect(() => {
     void (async () => {
       try {
-        const cfg = await apiFetch<AppConfig>('/admin/apps/notes');
+        const [cfg, modelList] = await Promise.all([
+          apiFetch<AppConfig>('/admin/apps/notes'),
+          apiFetch<ModelRow[]>('/admin/models'),
+        ]);
         setApp(cfg);
+        setModels(modelList);
       } catch {
         setApp(null);
+        setModels([]);
       }
     })();
   }, []);
@@ -103,6 +116,38 @@ export default function AdminNotesPage() {
             <option value="restricted">指定组/人（需在 ACL API 配置）</option>
           </select>
         </label>
+
+        <label style={{ display: 'grid', gap: 6 }}>
+          AI 改稿模型
+          <select
+            value={app.defaultModelConfigId ?? ''}
+            onChange={(e) =>
+              void save({
+                defaultModelConfigId: e.target.value || null,
+              })
+            }
+          >
+            <option value="">使用租户已启用的默认模型（fallback）</option>
+            {models
+              .filter((m) => m.enabled)
+              .map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.displayName}
+                </option>
+              ))}
+          </select>
+        </label>
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--muted)' }}>
+          AI 改稿使用此模型；未选择时回退到租户可用模型；均无则报错提示去配置模型。
+          {models.length === 0 && (
+            <>
+              {' '}
+              <a href="/admin/models" style={{ color: 'var(--accent)' }}>
+                前往配置模型 →
+              </a>
+            </>
+          )}
+        </p>
 
         {saving && <p style={{ margin: 0, color: 'var(--muted)' }}>保存中…</p>}
       </section>

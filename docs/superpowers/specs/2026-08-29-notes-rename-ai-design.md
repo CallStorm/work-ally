@@ -1,6 +1,6 @@
 # 笔记：改名 + 旁路 AI 改稿
 
-> 状态：**已批准，待写实现计划**  
+> 状态：**已实现**  
 > 日期：2026-08-29  
 > 前置：`docs/superpowers/specs/2026-08-29-handbook-personal-notes-design.md`（v1 已实现，原名「手册」）  
 > 本版：显示名/slug 全面改为「笔记」/`notes`；新增笔记旁路 AI 多轮对话，整篇应用与一键还原
