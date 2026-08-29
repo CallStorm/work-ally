@@ -92,9 +92,12 @@ export function NotesAiPanel({
   const [input, setInput] = useState('');
   const listRef = useRef<HTMLDivElement>(null);
   const fetchIdRef = useRef(0);
+  const noteIdRef = useRef(noteId);
+  noteIdRef.current = noteId;
 
   const loadHistory = useCallback(async () => {
     const requestId = ++fetchIdRef.current;
+    setMessages([]);
     setLoadingHistory(true);
     setError(null);
     try {
@@ -115,6 +118,12 @@ export function NotesAiPanel({
   }, [noteId]);
 
   useEffect(() => {
+    setMessages([]);
+    setError(null);
+    setInput('');
+  }, [noteId]);
+
+  useEffect(() => {
     if (!open) return;
     void loadHistory();
   }, [open, noteId, loadHistory]);
@@ -129,13 +138,14 @@ export function NotesAiPanel({
     const trimmed = prompt.trim();
     if (!trimmed || sending) return;
 
+    const sendNoteId = noteId;
     setSending(true);
     setError(null);
     setInput('');
 
     try {
       const data = await apiFetch<PostMessageResponse>(
-        `/apps/notes/notes/${noteId}/ai/messages`,
+        `/apps/notes/notes/${sendNoteId}/ai/messages`,
         {
           method: 'POST',
           body: JSON.stringify({
@@ -146,8 +156,10 @@ export function NotesAiPanel({
           }),
         },
       );
+      if (sendNoteId !== noteIdRef.current) return;
       setMessages(data.messages);
     } catch (err) {
+      if (sendNoteId !== noteIdRef.current) return;
       const message =
         err instanceof ApiError
           ? err.message
@@ -156,6 +168,7 @@ export function NotesAiPanel({
             : '发送失败';
       setError(message);
     } finally {
+      if (sendNoteId !== noteIdRef.current) return;
       setSending(false);
     }
   }

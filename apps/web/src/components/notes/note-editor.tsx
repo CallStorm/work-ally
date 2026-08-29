@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
@@ -144,6 +144,7 @@ export function NoteEditor({
   const [moreOpen, setMoreOpen] = useState(false);
   const [charCount, setCharCount] = useState(0);
   const [, bump] = useState(0);
+  const lastEmittedMdRef = useRef('');
 
   const editor = useEditor(
     {
@@ -178,12 +179,28 @@ export function NoteEditor({
         bump((n) => n + 1);
         const md = readMarkdown(ed);
         if (md.length > BODY_MD_MAX) return;
+        lastEmittedMdRef.current = md;
         onChangeBody(md);
       },
       onSelectionUpdate: () => bump((n) => n + 1),
     },
     [note?.id],
   );
+
+  useEffect(() => {
+    if (!note) return;
+    lastEmittedMdRef.current = note.bodyMd;
+  }, [note?.id]);
+
+  useEffect(() => {
+    if (!editor || !note) return;
+    const incoming = note.bodyMd;
+    const currentMd = readMarkdown(editor);
+    if (incoming === lastEmittedMdRef.current || incoming === currentMd) return;
+    editor.commands.setContent(incoming, { emitUpdate: false });
+    lastEmittedMdRef.current = incoming;
+    setCharCount(countChars(editor.getText()));
+  }, [editor, note?.bodyMd, note?.id]);
 
   useEffect(() => {
     if (!editor) return;

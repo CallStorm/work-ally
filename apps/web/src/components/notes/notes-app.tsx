@@ -105,6 +105,7 @@ export function NotesApp() {
   const deletingIdsRef = useRef(new Set<string>());
   const inFlightSaveRef = useRef<Promise<void> | null>(null);
   const drainPendingRef = useRef<() => Promise<void>>(async () => {});
+  const bodyMdRef = useRef('');
 
   const loadData = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -326,6 +327,13 @@ export function NotesApp() {
     setPreviousBodyMd(null);
   }, [selectedNoteId]);
 
+  const selectedNote =
+    notes.find((n) => n.id === selectedNoteId) ?? null;
+
+  useEffect(() => {
+    bodyMdRef.current = selectedNote?.bodyMd ?? '';
+  }, [selectedNote?.id, selectedNote?.bodyMd]);
+
   async function handleSelectNote(id: string) {
     if (id === selectedNoteId) return;
     await drainPending();
@@ -340,13 +348,14 @@ export function NotesApp() {
 
   function handleChangeBody(bodyMd: string) {
     if (!selectedNoteId) return;
+    bodyMdRef.current = bodyMd;
     setActionError(null);
     scheduleSave(selectedNoteId, { bodyMd });
   }
 
   function handleApplyAi(draftMd: string) {
     if (!selectedNote) return;
-    setPreviousBodyMd(selectedNote.bodyMd);
+    setPreviousBodyMd(bodyMdRef.current);
     handleChangeBody(draftMd);
   }
 
@@ -430,9 +439,6 @@ export function NotesApp() {
     }
   }
 
-  const selectedNote =
-    notes.find((n) => n.id === selectedNoteId) ?? null;
-
   return (
     <div className="handbook-app">
       {loadError && (
@@ -498,6 +504,7 @@ export function NotesApp() {
         </section>
         {aiOpen && selectedNote ? (
           <NotesAiPanel
+            key={selectedNote.id}
             noteId={selectedNote.id}
             title={selectedNote.title}
             bodyMd={selectedNote.bodyMd}
