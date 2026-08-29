@@ -476,6 +476,60 @@ export class ModelsService implements OnModuleInit {
     return text;
   }
 
+  async completeChatMessages(input: {
+    tenantId: string;
+    modelConfigId?: string | null;
+    system: string;
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    maxTokens?: number;
+  }): Promise<string> {
+    let creds = await this.resolveCredentials({
+      tenantId: input.tenantId,
+      modelConfigId: input.modelConfigId,
+    });
+    if (!creds) {
+      creds = await this.resolveFirstAvailableCredentials(input.tenantId);
+    }
+    if (!creds) {
+      throw new BadRequestException(
+        '请先在管理端为笔记配置模型或添加可用模型',
+      );
+    }
+    const root = creds.baseUrl.replace(/\/$/, '').replace(/\/v1$/, '');
+    const url = `${root}/v1/messages`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': creds.apiKey,
+        Authorization: `Bearer ${creds.apiKey}`,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: creds.modelId,
+        max_tokens: input.maxTokens ?? 2048,
+        system: input.system,
+        messages: input.messages,
+      }),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new BadRequestException(
+        `模型调用失败 (${res.status}): ${text.slice(0, 200)}`,
+      );
+    }
+    const json = (await res.json()) as {
+      content?: Array<{ type?: string; text?: string }>;
+    };
+    const text = (json.content ?? [])
+      .filter((c) => c.type === 'text')
+      .map((c) => c.text ?? '')
+      .join('\n')
+      .trim();
+    if (!text) throw new BadRequestException('模型返回为空');
+    return text;
+  }
+
   private envFallbackCredentials(
     modelId?: string | null,
   ): ResolvedLlmCredentials | null {
