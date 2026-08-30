@@ -6,6 +6,8 @@ import type { CategorySelection, HandbookCategory } from './types';
 export type CategoryTreeProps = {
   categories: HandbookCategory[];
   selection: CategorySelection;
+  /** Left rail highlights this id (root ancestor when browsing a child) */
+  highlightId: CategorySelection;
   onSelect: (selection: CategorySelection) => void;
   onCreate: (name: string, parentId?: string | null) => void | Promise<void>;
   onRename: (id: string, name: string) => void | Promise<void>;
@@ -15,6 +17,46 @@ export type CategoryTreeProps = {
 type Draft =
   | { mode: 'create'; parentId: string | null }
   | { mode: 'rename'; id: string; name: string };
+
+function FolderIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+    >
+      <path
+        d="M2 4.5A1.5 1.5 0 0 1 3.5 3h2.379a1.5 1.5 0 0 1 1.06.44l.622.62A.5.5 0 0 0 7.914 4H12.5A1.5 1.5 0 0 1 14 5.5v6A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5v-7Z"
+        fill="currentColor"
+        opacity="0.85"
+      />
+    </svg>
+  );
+}
+
+function InboxIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden
+    >
+      <path
+        d="M2.5 3.5h11v6.2L11.2 12.5H4.8L2.5 9.7V3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        fill="none"
+      />
+      <path d="M2.5 9.5h3.2l.8 1.5h3l.8-1.5h3.2" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
 
 function itemClass(active: boolean, extra?: string) {
   return [
@@ -68,6 +110,7 @@ function NameField({
 export function CategoryTree({
   categories,
   selection,
+  highlightId,
   onSelect,
   onCreate,
   onRename,
@@ -80,8 +123,6 @@ export function CategoryTree({
   const submittingRef = useRef(false);
 
   const roots = categories.filter((c) => c.parentId === null);
-  const childrenOf = (id: string) =>
-    categories.filter((c) => c.parentId === id);
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -137,22 +178,20 @@ export function CategoryTree({
     void onDelete(id);
   }
 
-  function renderMenu(cat: HandbookCategory, canAddChild: boolean) {
+  function renderMenu(cat: HandbookCategory) {
     if (menuId !== cat.id) return null;
     return (
       <div className="handbook-tree__menu" role="menu">
         <button type="button" role="menuitem" onClick={() => startRename(cat)}>
           重命名
         </button>
-        {canAddChild && (
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => startCreate(cat.id)}
-          >
-            添加子分类
-          </button>
-        )}
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => startCreate(cat.id)}
+        >
+          添加子分类
+        </button>
         <button
           type="button"
           role="menuitem"
@@ -164,54 +203,69 @@ export function CategoryTree({
     );
   }
 
-  function renderRow(cat: HandbookCategory, child: boolean) {
+  function renderRoot(cat: HandbookCategory) {
     const renaming = draft?.mode === 'rename' && draft.id === cat.id;
+    const childDraft =
+      draft?.mode === 'create' && draft.parentId === cat.id;
+
     return (
-      <div
-        className={itemClass(
-          selection === cat.id,
-          child ? 'handbook-tree__item--child' : undefined,
-        )}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setMenuId(cat.id);
-        }}
-      >
-        {renaming && draft.mode === 'rename' ? (
-          <NameField
-            value={draft.name}
-            onChange={(name) => setDraft({ ...draft, name })}
-            onSubmit={submitRename}
-            onCancel={() => setDraft(null)}
-            placeholder="分类名称"
-            ariaLabel="重命名分类"
-          />
-        ) : (
-          <>
-            <button
-              type="button"
-              className="handbook-tree__label"
-              onClick={() => onSelect(cat.id)}
-            >
-              {cat.name}
-            </button>
-            <button
-              type="button"
-              className="handbook-tree__more"
-              aria-label="分类操作"
-              aria-haspopup="menu"
-              aria-expanded={menuId === cat.id}
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuId((cur) => (cur === cat.id ? null : cat.id));
-              }}
-            >
-              ⋯
-            </button>
-          </>
-        )}
-        {renderMenu(cat, !child)}
-      </div>
+      <li key={cat.id}>
+        <div
+          className={itemClass(highlightId === cat.id)}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setMenuId(cat.id);
+          }}
+        >
+          {renaming && draft.mode === 'rename' ? (
+            <NameField
+              value={draft.name}
+              onChange={(name) => setDraft({ ...draft, name })}
+              onSubmit={submitRename}
+              onCancel={() => setDraft(null)}
+              placeholder="分类名称"
+              ariaLabel="重命名分类"
+            />
+          ) : (
+            <>
+              <button
+                type="button"
+                className="handbook-tree__label"
+                onClick={() => onSelect(cat.id)}
+              >
+                <FolderIcon className="handbook-tree__icon" />
+                <span className="handbook-tree__name">{cat.name}</span>
+              </button>
+              <button
+                type="button"
+                className="handbook-tree__more"
+                aria-label="分类操作"
+                aria-haspopup="menu"
+                aria-expanded={menuId === cat.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuId((cur) => (cur === cat.id ? null : cat.id));
+                }}
+              >
+                ⋯
+              </button>
+            </>
+          )}
+          {renderMenu(cat)}
+        </div>
+        {childDraft ? (
+          <div className="handbook-tree__item handbook-tree__item--child">
+            <NameField
+              value={createName}
+              onChange={setCreateName}
+              onSubmit={submitCreate}
+              onCancel={() => setDraft(null)}
+              placeholder="子分类名称"
+              ariaLabel="新建子分类"
+            />
+          </div>
+        ) : null}
+      </li>
     );
   }
 
@@ -234,43 +288,24 @@ export function CategoryTree({
         <li>
           <button
             type="button"
-            className={itemClass(selection === 'all')}
+            className={itemClass(highlightId === 'all')}
             onClick={() => onSelect('all')}
           >
-            全部
+            <InboxIcon className="handbook-tree__icon" />
+            <span className="handbook-tree__name">全部</span>
           </button>
         </li>
         <li>
           <button
             type="button"
-            className={itemClass(selection === 'uncategorized')}
+            className={itemClass(highlightId === 'uncategorized')}
             onClick={() => onSelect('uncategorized')}
           >
-            未分类
+            <FolderIcon className="handbook-tree__icon" />
+            <span className="handbook-tree__name">未分类</span>
           </button>
         </li>
-        {roots.map((root) => (
-          <li key={root.id}>
-            {renderRow(root, false)}
-            <ul className="handbook-tree__children">
-              {childrenOf(root.id).map((child) => (
-                <li key={child.id}>{renderRow(child, true)}</li>
-              ))}
-              {draft?.mode === 'create' && draft.parentId === root.id && (
-                <li className="handbook-tree__item handbook-tree__item--child">
-                  <NameField
-                    value={createName}
-                    onChange={setCreateName}
-                    onSubmit={submitCreate}
-                    onCancel={() => setDraft(null)}
-                    placeholder="子分类名称"
-                    ariaLabel="新建子分类"
-                  />
-                </li>
-              )}
-            </ul>
-          </li>
-        ))}
+        {roots.map((root) => renderRoot(root))}
       </ul>
       {creatingRoot ? (
         <NameField
@@ -282,6 +317,10 @@ export function CategoryTree({
           ariaLabel="新建分类"
         />
       ) : null}
+      {/* selection kept for callers that still need exact browse target */}
+      <span className="handbook-tree__sr" hidden>
+        {selection}
+      </span>
     </nav>
   );
 }

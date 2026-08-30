@@ -1,7 +1,8 @@
 # Task 8 Report — Admin model binding + smoke docs
 
 **Status:** ✅ Complete (static); live AI smoke **PENDING**  
-**Branch:** `feat/handbook`
+**Branch:** `feat/handbook`  
+**Commit:** `c106213` — `docs: mark notes rename+AI implemented after smoke`
 
 ## Summary
 

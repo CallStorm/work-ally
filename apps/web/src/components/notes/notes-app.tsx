@@ -38,6 +38,44 @@ function categoryIdForCreate(selection: CategorySelection): string | null {
   return selection;
 }
 
+function highlightForSelection(
+  selection: CategorySelection,
+  categories: HandbookCategory[],
+): CategorySelection {
+  if (selection === 'all' || selection === 'uncategorized') return selection;
+  const cat = categories.find((c) => c.id === selection);
+  if (!cat) return selection;
+  return cat.parentId ?? cat.id;
+}
+
+function childCategoriesOf(
+  selection: CategorySelection,
+  categories: HandbookCategory[],
+): HandbookCategory[] {
+  if (selection === 'all' || selection === 'uncategorized') return [];
+  return categories
+    .filter((c) => c.parentId === selection)
+    .slice()
+    .sort(
+      (a, b) =>
+        a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, 'zh-CN'),
+    );
+}
+
+function breadcrumbFor(
+  selection: CategorySelection,
+  categories: HandbookCategory[],
+): Array<{ id: string | null; name: string }> {
+  if (selection === 'all' || selection === 'uncategorized') return [];
+  const cat = categories.find((c) => c.id === selection);
+  if (!cat?.parentId) return [];
+  const parent = categories.find((c) => c.id === cat.parentId);
+  return [
+    { id: parent?.id ?? null, name: parent?.name ?? '上级' },
+    { id: cat.id, name: cat.name },
+  ];
+}
+
 function buildNotePatch(patch: NotePatch): {
   body: NotePatch | null;
   error: string | null;
@@ -330,6 +368,10 @@ export function NotesApp() {
   const selectedNote =
     notes.find((n) => n.id === selectedNoteId) ?? null;
 
+  const highlightId = highlightForSelection(selection, categories);
+  const childCategories = childCategoriesOf(selection, categories);
+  const listBreadcrumb = breadcrumbFor(selection, categories);
+
   useEffect(() => {
     bodyMdRef.current = selectedNote?.bodyMd ?? '';
   }, [selectedNote?.id, selectedNote?.bodyMd]);
@@ -476,6 +518,7 @@ export function NotesApp() {
           <CategoryTree
             categories={categories}
             selection={selection}
+            highlightId={highlightId}
             onSelect={(next) => void handleSelect(next)}
             onCreate={handleCreateCategory}
             onRename={handleRename}
@@ -487,7 +530,13 @@ export function NotesApp() {
             notes={notes}
             selectedNoteId={selectedNoteId}
             query={query}
-            onSelect={(id) => void handleSelectNote(id)}
+            childCategories={childCategories}
+            breadcrumb={listBreadcrumb}
+            onSelectNote={(id) => void handleSelectNote(id)}
+            onOpenCategory={(id) => void handleSelect(id)}
+            onBreadcrumb={(id) =>
+              void handleSelect(id ?? 'all')
+            }
             onCreate={() => handleCreate()}
           />
         </section>

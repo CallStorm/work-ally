@@ -40,6 +40,21 @@ function displayUserContent(content: string): string {
   return content;
 }
 
+/** Hide raw draft payload (markers / fences) from the chat bubble. */
+function displayAssistantContent(content: string, hasDraft: boolean): string {
+  const text = content
+    .replace(/<<<DRAFT_MD\s*\r?\n[\s\S]*?\r?\nDRAFT_MD>>>/gi, '')
+    .replace(/```md\b[^\n]*\r?\n[\s\S]*$/i, '')
+    .replace(/```[\s\S]*$/m, '') // leftover trailing fences
+    .trim();
+
+  if (text) return text;
+  if (hasDraft) {
+    return '已生成完整改稿草稿，可在下方预览后应用到笔记。';
+  }
+  return '未解析到完整正文，请再点一次「优化排版」重试。';
+}
+
 function latestDraftMd(messages: NotesAiMessage[]): string | null {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
@@ -49,13 +64,14 @@ function latestDraftMd(messages: NotesAiMessage[]): string | null {
 }
 
 function AssistantMessage({ message }: { message: NotesAiMessage }) {
-  const [draftOpen, setDraftOpen] = useState(false);
+  const [draftOpen, setDraftOpen] = useState(true);
   const hasDraft = Boolean(message.draftMd);
+  const summary = displayAssistantContent(message.content, hasDraft);
 
   return (
     <div className="notes-ai__msg notes-ai__msg--assistant">
       <div className="notes-ai__msg-role">助手</div>
-      <div className="notes-ai__msg-body">{message.content}</div>
+      <div className="notes-ai__msg-body">{summary}</div>
       {hasDraft ? (
         <div className="notes-ai__draft">
           <button
@@ -125,8 +141,12 @@ export function NotesAiPanel({
 
   useEffect(() => {
     if (!open) return;
-    void loadHistory();
-  }, [open, noteId, loadHistory]);
+    // 每次打开面板都从空会话开始，避免沿用旧对话导致排版错乱
+    setMessages([]);
+    setError(null);
+    setInput('');
+    setLoadingHistory(false);
+  }, [open, noteId]);
 
   useEffect(() => {
     if (!open) return;
@@ -134,14 +154,23 @@ export function NotesAiPanel({
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, open, sending]);
 
-  async function sendMessage(prompt: string, action: NotesAiAction) {
+  async function sendMessage(
+    prompt: string,
+    action: NotesAiAction,
+    opts?: { resetSession?: boolean },
+  ) {
     const trimmed = prompt.trim();
     if (!trimmed || sending) return;
 
+    const resetSession = Boolean(opts?.resetSession);
     const sendNoteId = noteId;
     setSending(true);
     setError(null);
     setInput('');
+    if (resetSession) {
+      setMessages([]);
+      fetchIdRef.current += 1;
+    }
 
     try {
       const data = await apiFetch<PostMessageResponse>(
@@ -153,6 +182,7 @@ export function NotesAiPanel({
             action,
             bodyMd,
             title,
+            resetSession,
           }),
         },
       );
@@ -203,7 +233,9 @@ export function NotesAiPanel({
           type="button"
           className="notes-ai__quick"
           disabled={busy}
-          onClick={() => void sendMessage(FORMAT_PROMPT, 'format')}
+          onClick={() =>
+            void sendMessage(FORMAT_PROMPT, 'format', { resetSession: true })
+          }
         >
           优化排版
         </button>
@@ -211,7 +243,9 @@ export function NotesAiPanel({
           type="button"
           className="notes-ai__quick"
           disabled={busy}
-          onClick={() => void sendMessage(ENRICH_PROMPT, 'enrich')}
+          onClick={() =>
+            void sendMessage(ENRICH_PROMPT, 'enrich', { resetSession: true })
+          }
         >
           完善内容
         </button>

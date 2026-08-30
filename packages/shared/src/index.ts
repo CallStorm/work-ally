@@ -161,6 +161,8 @@ export const CreateNotesAiMessageSchema = z.object({
   /** Current editor markdown snapshot from client */
   bodyMd: z.string().max(50000),
   title: z.string().trim().max(191).optional().default(''),
+  /** Clear prior thread messages before this turn (format/enrich should set true) */
+  resetSession: z.boolean().optional().default(false),
 });
 export type CreateNotesAiMessageInput = z.infer<typeof CreateNotesAiMessageSchema>;
 

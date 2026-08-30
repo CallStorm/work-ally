@@ -11,14 +11,51 @@ import { AppRegistryService } from '../app-registry.service';
 const BODY_MAX = 12000;
 const HISTORY_LIMIT = 8;
 
+const DRAFT_HINT =
+  '必须输出从标题开始的完整文档，禁止从文章中部或代码块中部起笔。' +
+  '先用一两句话说明改动，然后在回复末尾用下列标记包裹完整 Markdown 正文（标记内可含普通代码块，勿再用三反引号 md 包裹全文）：\n' +
+  '<<<DRAFT_MD\n（完整正文）\nDRAFT_MD>>>';
+
 const SYSTEM_FORMAT =
-  '你是笔记排版助手。只根据用户提供的标题与正文整理结构（标题层级、列表、分段），不要编造未出现的事实。必须在回复末尾给出完整 Markdown 正文，放在唯一的 md 围栏中：以三反引号 md 开始、三反引号结束。';
+  `你是笔记排版助手。只根据用户提供的标题与正文整理结构（标题层级、列表、分段），不要编造未出现的事实。${DRAFT_HINT}`;
 
 const SYSTEM_ENRICH =
-  '你是 SOP/工作流程写作助手。在不编造具体环境细节的前提下，补全步骤、注意项与验收项；不确定处标注「待确认」。必须在回复末尾给出完整 Markdown 正文，放在唯一的 md 围栏中。';
+  `你是 SOP/工作流程写作助手。在不编造具体环境细节的前提下，补全步骤、注意项与验收项；不确定处标注「待确认」。${DRAFT_HINT}`;
 
 const SYSTEM_CUSTOM =
-  '你是笔记写作助手。根据用户提供的标题、正文与要求修改内容，不要编造未出现的事实。必须在回复末尾给出完整 Markdown 正文，放在唯一的 md 围栏中：以三反引号 md 开始、三反引号结束。';
+  `你是笔记写作助手。根据用户提供的标题、正文与要求修改内容，不要编造未出现的事实。${DRAFT_HINT}`;
+
+/**
+ * Text starts *inside* an already-opened ``` fence. Return body up to the
+ * matching close. Nested fences (```sql … ```) use depth so they do not end
+ * the outer block early. If never closed, return the full remainder.
+ */
+export function extractBalancedFenceInner(inner: string): string | null {
+  const lines = inner.split(/\r?\n/);
+  let depth = 1;
+  const out: string[] = [];
+
+  for (const line of lines) {
+    const fence = /^(`{3,})([\w+-]*)\s*$/.exec(line);
+    if (!fence) {
+      out.push(line);
+      continue;
+    }
+    const lang = fence[2] ?? '';
+    if (lang) {
+      depth += 1;
+      out.push(line);
+      continue;
+    }
+    depth -= 1;
+    if (depth === 0) {
+      return out.join('\n');
+    }
+    out.push(line);
+  }
+
+  return out.join('\n');
+}
 
 @Injectable()
 export class NotesAiService {
@@ -67,6 +104,13 @@ export class NotesAiService {
     const modelConfigId = app?.defaultModelConfigId ?? null;
 
     const thread = await this.ensureThread(user, noteId);
+
+    if (input.resetSession) {
+      await this.prisma.notesAiMessage.deleteMany({
+        where: { threadId: thread.id },
+      });
+    }
+
     const userContent = this.buildUserMessage(input);
 
     await this.prisma.notesAiMessage.create({
@@ -83,7 +127,7 @@ export class NotesAiService {
         role: { in: ['user', 'assistant'] },
       },
       orderBy: { createdAt: 'desc' },
-      take: HISTORY_LIMIT,
+      take: input.resetSession ? 1 : HISTORY_LIMIT,
     });
 
     const chatMessages = recent.reverse().map((m) => ({
@@ -139,14 +183,27 @@ export class NotesAiService {
   }
 
   parseDraftMd(text: string): string | null {
-    const mdMatches = [...text.matchAll(/```md\s*\n([\s\S]*?)```/gi)];
-    if (mdMatches.length > 0) {
-      return mdMatches[mdMatches.length - 1][1].trim();
+    // Preferred marker — nested ```sql cannot break this
+    const marker = [
+      ...text.matchAll(/<<<DRAFT_MD\s*\r?\n([\s\S]*?)\r?\n\s*DRAFT_MD>>>/gi),
+    ];
+    if (marker.length > 0) {
+      return marker[marker.length - 1][1].trim();
     }
 
-    const anyMatches = [...text.matchAll(/```(?:\w+)?\s*\n?([\s\S]*?)```/g)];
-    if (anyMatches.length > 0) {
-      return anyMatches[anyMatches.length - 1][1].trim();
+    // Legacy ```md: balance fences so inner ```sql does not truncate early
+    const openRe = /```md[^\n]*\r?\n/gi;
+    let openMatch: RegExpExecArray | null = null;
+    let lastOpen: RegExpExecArray | null = null;
+    while ((openMatch = openRe.exec(text)) !== null) {
+      lastOpen = openMatch;
+    }
+    if (lastOpen) {
+      const inner = text.slice(lastOpen.index + lastOpen[0].length);
+      const extracted = extractBalancedFenceInner(inner);
+      if (extracted != null && extracted.trim()) {
+        return extracted.trim();
+      }
     }
 
     return null;

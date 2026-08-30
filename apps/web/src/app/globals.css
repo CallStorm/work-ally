@@ -2538,6 +2538,9 @@ body.is-dragging-task .task-chip {
 .handbook-tree__label {
   flex: 1;
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2548,6 +2551,29 @@ body.is-dragging-task .task-chip {
   text-align: left;
   cursor: pointer;
   padding: 0;
+}
+
+.handbook-tree__icon {
+  flex-shrink: 0;
+  color: #7a8b9a;
+}
+
+.handbook-tree__item--active .handbook-tree__icon {
+  color: var(--accent, #2f6fed);
+}
+
+.handbook-tree__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.handbook-tree__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .handbook-tree__more {
@@ -2657,6 +2683,99 @@ body.is-dragging-task .task-chip {
 
 .handbook-list__new:hover {
   background: var(--accent-soft);
+}
+
+.handbook-list__crumb {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.handbook-list__crumb-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.handbook-list__crumb-sep {
+  margin: 0 4px;
+  color: var(--muted);
+}
+
+.handbook-list__crumb-link {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.handbook-list__crumb-link:hover {
+  text-decoration: underline;
+}
+
+.handbook-list__crumb-current {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.handbook-list__folders {
+  list-style: none;
+  margin: 0;
+  padding: 4px 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.handbook-list__folder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.handbook-list__folder:hover {
+  background: var(--accent-soft);
+}
+
+.handbook-list__folder-icon {
+  flex-shrink: 0;
+  color: #6fbf95;
+}
+
+.handbook-list__folder-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.handbook-list__folder-name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.handbook-list__folder-meta {
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .handbook-list__empty {
