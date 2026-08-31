@@ -200,6 +200,50 @@ export const UpdateHandbookNoteSchema = z.object({
 });
 export type UpdateHandbookNoteInput = z.infer<typeof UpdateHandbookNoteSchema>;
 
+export const BAZAAR_SLUG = 'bazaar';
+
+export const BazaarStallSkinSchema = z.enum([
+  'neon-blue',
+  'violet-pulse',
+  'cyan-grid',
+  'magenta-flare',
+]);
+export type BazaarStallSkin = z.infer<typeof BazaarStallSkinSchema>;
+
+export const UpsertBazaarCompanySchema = z.object({
+  name: z.string().trim().min(1).max(64),
+  slogan: z.string().trim().max(120).optional().default(''),
+  stallSkin: BazaarStallSkinSchema.optional().default('neon-blue'),
+});
+export type UpsertBazaarCompanyInput = z.infer<typeof UpsertBazaarCompanySchema>;
+
+export const UpsertBazaarProductSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  pitch: z.string().trim().min(1).max(2000),
+  features: z
+    .array(z.string().trim().min(1).max(40))
+    .max(8)
+    .optional()
+    .default([]),
+  coverHue: z.number().int().min(0).max(359).optional().default(210),
+});
+export type UpsertBazaarProductInput = z.infer<typeof UpsertBazaarProductSchema>;
+
+export const PatchBazaarProductSchema = UpsertBazaarProductSchema.partial();
+export type PatchBazaarProductInput = z.infer<typeof PatchBazaarProductSchema>;
+
+export const RateBazaarProductSchema = z.object({
+  stars: z.number().int().min(1).max(5),
+});
+export type RateBazaarProductInput = z.infer<typeof RateBazaarProductSchema>;
+
+export const PolishBazaarProductSchema = z.object({
+  title: z.string().trim().min(1).max(80),
+  pitch: z.string().trim().min(1).max(2000),
+  features: z.array(z.string().trim().min(1).max(40)).max(8).optional().default([]),
+});
+export type PolishBazaarProductInput = z.infer<typeof PolishBazaarProductSchema>;
+
 export const UpdateAppRegistrySchema = z.object({
   enabled: z.boolean().optional(),
   defaultModelConfigId: z.string().nullable().optional(),
