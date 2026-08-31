@@ -77,3 +77,14 @@ export const BAZAAR_STALL_SKIN_LABELS: Record<BazaarStallSkin, string> = {
   'cyan-grid': '青网格',
   'magenta-flare': '品红焰',
 };
+
+export type BazaarProductHint = {
+  userName?: string;
+  companyName?: string;
+};
+
+export function bazaarCoverStyle(hue: number) {
+  return {
+    background: `linear-gradient(135deg, hsl(${hue} 80% 45%), hsl(${hue} 80% 22%))`,
+  };
+}

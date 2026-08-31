@@ -2,20 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, apiFetch } from '@/lib/api';
-import type { BazaarStall } from './types';
-import { BAZAAR_SHELF_LIMIT } from './types';
+import type { BazaarProductHint, BazaarStall } from './types';
+import { BAZAAR_SHELF_LIMIT, bazaarCoverStyle } from './types';
 
 type Props = {
   userId: string;
-  onOpenProduct: (productId: string) => void;
+  onOpenProduct: (productId: string, hint?: BazaarProductHint) => void;
   onBack: () => void;
 };
-
-function coverStyle(hue: number) {
-  return {
-    background: `linear-gradient(135deg, hsl(${hue} 72% 46%), hsl(${hue} 68% 26%))`,
-  };
-}
 
 function starsLabel(avgStars: number, ratingCount: number) {
   if (ratingCount === 0) return '暂无评分';
@@ -97,15 +91,23 @@ export function UserStall({ userId, onOpenProduct, onBack }: Props) {
                     <button
                       type="button"
                       className="bazaar-stall-card__cover bazaar-stall-card__cover--btn"
-                      style={coverStyle(item.coverHue)}
-                      onClick={() => onOpenProduct(item.id)}
+                      style={bazaarCoverStyle(item.coverHue)}
+                      onClick={() =>
+                        onOpenProduct(item.id, {
+                          companyName: stall.company.name,
+                        })
+                      }
                       aria-label={`查看产品 ${item.title}`}
                     />
                     <h2>
                       <button
                         type="button"
                         className="bazaar-card__title"
-                        onClick={() => onOpenProduct(item.id)}
+                        onClick={() =>
+                          onOpenProduct(item.id, {
+                            companyName: stall.company.name,
+                          })
+                        }
                       >
                         {item.title}
                       </button>

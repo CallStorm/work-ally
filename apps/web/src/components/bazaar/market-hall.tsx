@@ -2,21 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-import type { BazaarCompany, BazaarMarketItem, MarketSort } from './types';
+import type {
+  BazaarCompany,
+  BazaarMarketItem,
+  BazaarProductHint,
+  MarketSort,
+} from './types';
+import { bazaarCoverStyle } from './types';
 
 type Props = {
   company: BazaarCompany;
   onOpenMyStall: () => void;
   onOpenLeaderboard: () => void;
-  onOpenProduct: (productId: string) => void;
+  onOpenProduct: (productId: string, hint?: BazaarProductHint) => void;
   onOpenStall: (userId: string) => void;
 };
-
-function coverStyle(hue: number) {
-  return {
-    background: `linear-gradient(135deg, hsl(${hue} 72% 46%), hsl(${hue} 68% 26%))`,
-  };
-}
 
 function starsLabel(item: BazaarMarketItem) {
   if (item.ratingCount === 0) return '暂无评分';
@@ -131,8 +131,13 @@ export function MarketHall({
                 <button
                   type="button"
                   className="bazaar-card__cover"
-                  style={coverStyle(item.coverHue)}
-                  onClick={() => onOpenProduct(item.id)}
+                  style={bazaarCoverStyle(item.coverHue)}
+                  onClick={() =>
+                    onOpenProduct(item.id, {
+                      userName: item.userName,
+                      companyName: item.companyName,
+                    })
+                  }
                   aria-label={`查看产品 ${item.title}`}
                 />
                 <div className="bazaar-card__body">
@@ -140,7 +145,12 @@ export function MarketHall({
                     <button
                       type="button"
                       className="bazaar-card__title"
-                      onClick={() => onOpenProduct(item.id)}
+                      onClick={() =>
+                        onOpenProduct(item.id, {
+                          userName: item.userName,
+                          companyName: item.companyName,
+                        })
+                      }
                     >
                       {item.title}
                     </button>

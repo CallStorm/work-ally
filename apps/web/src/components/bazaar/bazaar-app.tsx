@@ -2,27 +2,19 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, apiFetch } from '@/lib/api';
+import { Leaderboard } from './leaderboard';
 import { MarketHall } from './market-hall';
 import { MyStall } from './my-stall';
 import { OnboardingCompany } from './onboarding-company';
+import { ProductDetail } from './product-detail';
 import { UserStall } from './user-stall';
-import type { BazaarCompany, BazaarView } from './types';
-
-const STUB_COPY: Partial<Record<BazaarView, { title: string; body: string }>> = {
-  product: {
-    title: '产品详情',
-    body: '产品介绍与打星将在下一步接入。',
-  },
-  leaderboard: {
-    title: '排行榜',
-    body: '产品分榜将在下一步接入。',
-  },
-};
+import type { BazaarCompany, BazaarProductHint, BazaarView } from './types';
 
 export function BazaarApp() {
   const [view, setView] = useState<BazaarView>('market');
   const [company, setCompany] = useState<BazaarCompany | null>(null);
   const [productId, setProductId] = useState<string | null>(null);
+  const [productHint, setProductHint] = useState<BazaarProductHint | null>(null);
   const [stallUserId, setStallUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -79,8 +71,9 @@ export function BazaarApp() {
     setView('leaderboard');
   }
 
-  function goProduct(id: string) {
+  function goProduct(id: string, hint?: BazaarProductHint) {
     setProductId(id);
+    setProductHint(hint ?? null);
     setView('product');
   }
 
@@ -94,7 +87,6 @@ export function BazaarApp() {
     setView('market');
   }
 
-  const stub = STUB_COPY[view];
   const showChrome = !loading && !loadError && view !== 'onboarding';
 
   return (
@@ -153,7 +145,11 @@ export function BazaarApp() {
         />
       )}
       {!loading && !loadError && view === 'stall-mine' && company && (
-        <MyStall company={company} onCompanyChange={setCompany} />
+        <MyStall
+          company={company}
+          onCompanyChange={setCompany}
+          onOpenProduct={goProduct}
+        />
       )}
       {!loading && !loadError && view === 'stall-user' && stallUserId && (
         <UserStall
@@ -162,17 +158,17 @@ export function BazaarApp() {
           onBack={goMarket}
         />
       )}
-      {!loading && !loadError && stub && (
-        <div className="bazaar-stub">
-          <h1>{stub.title}</h1>
-          <p>{stub.body}</p>
-          {view === 'product' && productId && (
-            <p className="bazaar-stub__meta">产品 {productId}</p>
-          )}
-          <button type="button" className="bazaar-btn" onClick={goMarket}>
-            返回展会大厅
-          </button>
-        </div>
+      {!loading && !loadError && view === 'product' && productId && (
+        <ProductDetail
+          productId={productId}
+          hint={productHint}
+          onBack={goMarket}
+          onOpenStall={goStall}
+          onOpenMyStall={goMyStall}
+        />
+      )}
+      {!loading && !loadError && view === 'leaderboard' && (
+        <Leaderboard onOpenProduct={goProduct} />
       )}
     </div>
   );

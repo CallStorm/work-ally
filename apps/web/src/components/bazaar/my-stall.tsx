@@ -4,16 +4,23 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ProductEditor } from './product-editor';
-import type { BazaarCompany, BazaarProduct, BazaarStallSkin } from './types';
+import type {
+  BazaarCompany,
+  BazaarProduct,
+  BazaarProductHint,
+  BazaarStallSkin,
+} from './types';
 import {
   BAZAAR_SHELF_LIMIT,
   BAZAAR_STALL_SKIN_LABELS,
   BAZAAR_STALL_SKINS,
+  bazaarCoverStyle,
 } from './types';
 
 type Props = {
   company: BazaarCompany;
   onCompanyChange: (company: BazaarCompany) => void;
+  onOpenProduct: (productId: string, hint?: BazaarProductHint) => void;
 };
 
 type EditorState =
@@ -23,13 +30,7 @@ type EditorState =
 const NAME_MAX = 64;
 const SLOGAN_MAX = 120;
 
-function coverStyle(hue: number) {
-  return {
-    background: `linear-gradient(135deg, hsl(${hue} 72% 46%), hsl(${hue} 68% 26%))`,
-  };
-}
-
-export function MyStall({ company, onCompanyChange }: Props) {
+export function MyStall({ company, onCompanyChange, onOpenProduct }: Props) {
   const { auth } = useAuth();
   const [products, setProducts] = useState<BazaarProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -245,12 +246,26 @@ export function MyStall({ company, onCompanyChange }: Props) {
           {products.map((item) => (
             <li key={item.id}>
               <article className="bazaar-stall-card">
-                <div
-                  className="bazaar-stall-card__cover"
-                  style={coverStyle(item.coverHue)}
-                  aria-hidden
+                <button
+                  type="button"
+                  className="bazaar-stall-card__cover bazaar-stall-card__cover--btn"
+                  style={bazaarCoverStyle(item.coverHue)}
+                  onClick={() =>
+                    onOpenProduct(item.id, { companyName: company.name })
+                  }
+                  aria-label={`查看产品 ${item.title}`}
                 />
-                <h2>{item.title}</h2>
+                <h2>
+                  <button
+                    type="button"
+                    className="bazaar-card__title"
+                    onClick={() =>
+                      onOpenProduct(item.id, { companyName: company.name })
+                    }
+                  >
+                    {item.title}
+                  </button>
+                </h2>
                 <p className="bazaar-stall-card__meta">
                   {item.status === 'published' ? '已上架' : '草稿'}
                   {item.status === 'published' ? ` · ${item.score}分` : ''}

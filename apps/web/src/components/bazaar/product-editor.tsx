@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import type { BazaarProduct } from './types';
+import { bazaarCoverStyle } from './types';
 
 type PolishSuggestion = {
   title: string;
@@ -21,12 +22,6 @@ const TITLE_MAX = 80;
 const PITCH_MAX = 2000;
 const FEATURE_MAX = 40;
 const FEATURE_LIMIT = 8;
-
-function coverStyle(hue: number) {
-  return {
-    background: `linear-gradient(135deg, hsl(${hue} 72% 46%), hsl(${hue} 68% 26%))`,
-  };
-}
 
 export function ProductEditor({
   product,
@@ -217,7 +212,7 @@ export function ProductEditor({
 
         <div
           className="bazaar-editor__cover"
-          style={coverStyle(coverHue)}
+          style={bazaarCoverStyle(coverHue)}
           aria-hidden
         />
 
