@@ -11,6 +11,7 @@ const nav = [
   { href: '/admin/models', label: '模型配置' },
   { href: '/admin/apps/stickies', label: '应用 · 闪签' },
   { href: '/admin/apps/notes', label: '应用 · 笔记' },
+  { href: '/admin/apps/bazaar', label: '应用 · 创司集市' },
 ];
 
 export default function AdminLayout({

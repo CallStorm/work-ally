@@ -2088,6 +2088,26 @@ body.is-dragging-task .task-chip {
   color: #1a2a40;
 }
 
+.apps-list-page__card--bazaar {
+  padding: 0;
+}
+
+.apps-list-page__card--bazaar .apps-list-page__cover {
+  background: linear-gradient(160deg, #1a1630 0%, #0c1220 55%, #14182a 100%);
+}
+
+.apps-list-page__card--bazaar .apps-list-page__body {
+  padding: 16px 20px 20px;
+}
+
+.apps-list-page__card--bazaar .apps-list-page__body h2 {
+  font-family: Fraunces, Georgia, serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #14182a;
+}
+
 .apps-list-page__meta {
   display: inline-block;
   margin-top: 12px;
