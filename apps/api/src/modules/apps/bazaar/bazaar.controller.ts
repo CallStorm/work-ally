@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   PatchBazaarProductSchema,
+  PolishBazaarProductSchema,
   RateBazaarProductSchema,
   UpsertBazaarCompanySchema,
   UpsertBazaarProductSchema,
@@ -95,6 +96,21 @@ export class BazaarController {
   @Post('products/:id/unpublish')
   unpublishProduct(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.products.unpublish(user, id);
+  }
+
+  @Post('products/:id/polish')
+  polishProduct(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const override =
+      body != null &&
+      typeof body === 'object' &&
+      Object.keys(body as object).length > 0
+        ? parseBody(PolishBazaarProductSchema, body)
+        : undefined;
+    return this.products.polish(user, id, override);
   }
 
   @Put('products/:id/rating')

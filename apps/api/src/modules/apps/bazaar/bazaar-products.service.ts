@@ -7,11 +7,19 @@ import {
 import type { BazaarProduct, Prisma } from '@prisma/client';
 import type {
   PatchBazaarProductInput,
+  PolishBazaarProductInput,
   UpsertBazaarProductInput,
 } from '@work-ally/shared';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { AuthUser } from '../../../common/current-user.decorator';
+import { ModelsService } from '../../models/models.service';
+import { AppRegistryService } from '../app-registry.service';
 import { BAZAAR_BASE_SCORE, scoreFromStars } from './bazaar-score';
+
+const POLISH_SYSTEM =
+  '你是创司集市的产品文案润色助手。根据用户提供的名称、卖点和功能点润色文案，不要编造未出现的事实。' +
+  '必须只输出严格 JSON，不要 Markdown、不要解释：{"title":"...","pitch":"...","features":["..."]}' +
+  '约束：title 不超过 80 字，pitch 不超过 2000 字，features 最多 8 条、每条不超过 40 字。';
 
 export const PUBLISHED_SHELF_LIMIT = 8;
 
@@ -46,7 +54,11 @@ export function serializeProduct(row: BazaarProduct) {
 
 @Injectable()
 export class BazaarProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly registry: AppRegistryService,
+    private readonly models: ModelsService,
+  ) {}
 
   async listMine(user: AuthUser) {
     const rows = await this.prisma.bazaarProduct.findMany({
@@ -163,6 +175,42 @@ export class BazaarProductsService {
     return serializeProduct(row);
   }
 
+  async polish(
+    user: AuthUser,
+    productId: string,
+    override?: PolishBazaarProductInput,
+  ) {
+    const product = await this.getOwned(user, productId);
+    const current = serializeProduct(product);
+    const title = override?.title ?? current.title;
+    const pitch = override?.pitch ?? current.pitch;
+    const features = override?.features ?? current.features;
+
+    const app = await this.registry.getBazaarForUser(user);
+    const modelConfigId = app?.defaultModelConfigId ?? null;
+    if (!modelConfigId) {
+      throw new BadRequestException('请管理员为创司集市绑定默认模型');
+    }
+
+    const assistantText = await this.models.completeChatMessages({
+      tenantId: user.tenantId,
+      modelConfigId,
+      system: POLISH_SYSTEM,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            `名称：${title}`,
+            `卖点：${pitch}`,
+            `功能点：${JSON.stringify(features)}`,
+          ].join('\n'),
+        },
+      ],
+    });
+
+    return parsePolishResult(assistantText);
+  }
+
   async recomputeFromDb(productId: string) {
     const ratings = await this.prisma.bazaarRating.findMany({
       where: { productId },
@@ -179,4 +227,43 @@ export class BazaarProductsService {
     });
     return serializeProduct(row);
   }
+}
+
+function parsePolishResult(raw: string): {
+  title: string;
+  pitch: string;
+  features: string[];
+} {
+  let parsed: unknown;
+  const trimmed = raw.trim();
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    const match = trimmed.match(/\{[\s\S]*\}/);
+    if (!match) {
+      throw new BadRequestException('润色结果无法解析');
+    }
+    try {
+      parsed = JSON.parse(match[0]);
+    } catch {
+      throw new BadRequestException('润色结果无法解析');
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new BadRequestException('润色结果无法解析');
+  }
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj.title !== 'string' || typeof obj.pitch !== 'string') {
+    throw new BadRequestException('润色结果无法解析');
+  }
+  if (!Array.isArray(obj.features) || obj.features.some((item) => typeof item !== 'string')) {
+    throw new BadRequestException('润色结果无法解析');
+  }
+
+  return {
+    title: obj.title,
+    pitch: obj.pitch,
+    features: obj.features,
+  };
 }
