@@ -6,10 +6,13 @@ import {
   Param,
   Patch,
   Post,
+  Put,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
   PatchBazaarProductSchema,
+  RateBazaarProductSchema,
   UpsertBazaarCompanySchema,
   UpsertBazaarProductSchema,
 } from '@work-ally/shared';
@@ -18,7 +21,9 @@ import { CurrentUser, type AuthUser } from '../../../common/current-user.decorat
 import { parseBody } from '../../../common/zod';
 import { BazaarAppGuard } from '../bazaar-app.guard';
 import { BazaarCompanyService } from './bazaar-company.service';
+import { BazaarMarketService } from './bazaar-market.service';
 import { BazaarProductsService } from './bazaar-products.service';
+import { BazaarRatingsService } from './bazaar-ratings.service';
 
 @Controller('apps/bazaar')
 @UseGuards(JwtAuthGuard, BazaarAppGuard)
@@ -26,11 +31,21 @@ export class BazaarController {
   constructor(
     private readonly company: BazaarCompanyService,
     private readonly products: BazaarProductsService,
+    private readonly ratings: BazaarRatingsService,
+    private readonly market: BazaarMarketService,
   ) {}
 
   @Get('company')
   getCompany(@CurrentUser() user: AuthUser) {
     return this.company.getMine(user);
+  }
+
+  @Get('company/:userId')
+  getCompanyByUser(
+    @CurrentUser() user: AuthUser,
+    @Param('userId') userId: string,
+  ) {
+    return this.market.getCompany(user.tenantId, userId);
   }
 
   @Post('company')
@@ -80,5 +95,30 @@ export class BazaarController {
   @Post('products/:id/unpublish')
   unpublishProduct(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.products.unpublish(user, id);
+  }
+
+  @Put('products/:id/rating')
+  rateProduct(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const { stars } = parseBody(RateBazaarProductSchema, body);
+    return this.ratings.rate(user, id, stars);
+  }
+
+  @Get('market')
+  getMarket(@CurrentUser() user: AuthUser, @Query('sort') sort?: string) {
+    return this.market.market(user.tenantId, sort === 'hottest' ? 'hottest' : 'newest');
+  }
+
+  @Get('stalls/:userId')
+  getStall(@CurrentUser() user: AuthUser, @Param('userId') userId: string) {
+    return this.market.stall(user.tenantId, userId);
+  }
+
+  @Get('leaderboard')
+  getLeaderboard(@CurrentUser() user: AuthUser) {
+    return this.market.leaderboard(user.tenantId);
   }
 }

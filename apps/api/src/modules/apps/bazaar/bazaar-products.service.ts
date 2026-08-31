@@ -65,7 +65,14 @@ export class BazaarProductsService {
   }
 
   async get(user: AuthUser, id: string) {
-    return serializeProduct(await this.getOwned(user, id));
+    const row = await this.prisma.bazaarProduct.findFirst({
+      where: { id, tenantId: user.tenantId },
+    });
+    if (!row) throw new NotFoundException('产品不存在');
+    if (row.status !== 'published' && row.userId !== user.userId) {
+      throw new NotFoundException('产品不存在');
+    }
+    return serializeProduct(row);
   }
 
   async create(user: AuthUser, input: UpsertBazaarProductInput) {
