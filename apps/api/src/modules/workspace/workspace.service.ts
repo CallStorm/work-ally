@@ -8,7 +8,7 @@ import * as path from 'path';
 import type { AuthUser } from '../../common/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RuntimePathsService } from '../runtime/runtime-paths.service';
-import { guessMimeFromFilename } from './mime.util';
+import { guessMimeFromFilename, isImageMime } from './mime.util';
 
 export type WorkspaceEntry = {
   name: string;
@@ -65,7 +65,11 @@ export class WorkspaceService {
     return { root: '.', entries };
   }
 
-  async readFile(user: AuthUser, sessionId: string, relativePath: string) {
+  async resolveFile(
+    user: AuthUser,
+    sessionId: string,
+    relativePath: string,
+  ) {
     const session = await this.assertSessionAccess(user, sessionId);
     const workspaceDir = this.workspaceDir(session.tenantId, sessionId);
     const { normalized, abs } = this.resolveSafePath(workspaceDir, relativePath);
@@ -74,14 +78,41 @@ export class WorkspaceService {
     if (!stat.isFile()) throw new NotFoundException('Not a file');
     const filename = path.basename(normalized);
     const mimeType = guessMimeFromFilename(filename);
-    const content = fs.readFileSync(abs);
+    return { session, normalized, abs, filename, mimeType, sizeBytes: stat.size };
+  }
+
+  async readFile(user: AuthUser, sessionId: string, relativePath: string) {
+    const file = await this.resolveFile(user, sessionId, relativePath);
+    const buf = fs.readFileSync(file.abs);
+    if (isImageMime(file.mimeType)) {
+      return {
+        path: file.normalized,
+        filename: file.filename,
+        mimeType: file.mimeType,
+        sizeBytes: file.sizeBytes,
+        content: buf.toString('base64'),
+        encoding: 'base64' as const,
+        isBinary: false,
+      };
+    }
+    if (!this.isUtf8(buf)) {
+      return {
+        path: file.normalized,
+        filename: file.filename,
+        mimeType: file.mimeType,
+        sizeBytes: file.sizeBytes,
+        isBinary: true,
+        downloadOnly: true,
+      };
+    }
     return {
-      path: normalized,
-      filename,
-      mimeType,
-      sizeBytes: stat.size,
-      content: content.toString('utf8'),
-      isBinary: !this.isUtf8(content),
+      path: file.normalized,
+      filename: file.filename,
+      mimeType: file.mimeType,
+      sizeBytes: file.sizeBytes,
+      content: buf.toString('utf8'),
+      encoding: 'utf8' as const,
+      isBinary: false,
     };
   }
 

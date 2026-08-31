@@ -1,4 +1,7 @@
 import 'reflect-metadata';
+import { execSync } from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
@@ -11,6 +14,22 @@ function registerProcessGuards() {
     // eslint-disable-next-line no-console
     console.error('[api] uncaughtException:', error);
   });
+}
+
+function freePort(port: number) {
+  const candidates = [
+    path.resolve(process.cwd(), '../../scripts/kill-api-port.mjs'),
+    path.resolve(process.cwd(), 'scripts/kill-api-port.mjs'),
+    path.resolve(__dirname, '../../scripts/kill-api-port.mjs'),
+    path.resolve(__dirname, '../../../scripts/kill-api-port.mjs'),
+  ];
+  const script = candidates.find((p) => fs.existsSync(p));
+  if (!script) return;
+  try {
+    execSync(`node "${script}" ${port}`, { stdio: 'inherit' });
+  } catch {
+    // best-effort; listen retry still applies
+  }
 }
 
 async function listen(app: Awaited<ReturnType<typeof NestFactory.create>>, port: number) {
@@ -35,18 +54,21 @@ async function listen(app: Awaited<ReturnType<typeof NestFactory.create>>, port:
         }
         throw error;
       }
-      const waitMs = 1500 * attempt;
       // eslint-disable-next-line no-console
       console.warn(
-        `[api] Port ${port} busy, retrying in ${waitMs}ms (${attempt}/${maxAttempts})…`,
+        `[api] Port ${port} busy — freeing listeners then retry (${attempt}/${maxAttempts})…`,
       );
-      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      freePort(port);
+      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
     }
   }
 }
 
 async function bootstrap() {
   registerProcessGuards();
+  // Ensure agent bash/python child processes default to UTF-8 on Windows.
+  process.env.PYTHONUTF8 ??= '1';
+  process.env.PYTHONIOENCODING ??= 'utf-8';
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
   app.setGlobalPrefix('api');

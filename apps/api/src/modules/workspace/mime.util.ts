@@ -19,7 +19,20 @@ const EXT_MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.svg': 'image/svg+xml',
   '.pdf': 'application/pdf',
+  '.xlsx':
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.xls': 'application/vnd.ms-excel',
+  '.docx':
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.doc': 'application/msword',
+  '.pptx':
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.zip': 'application/zip',
 };
+
+export function isImageMime(mime: string | null | undefined): boolean {
+  return !!mime && mime.startsWith('image/');
+}
 
 export function guessMimeFromFilename(filename: string): string | null {
   const dot = filename.lastIndexOf('.');

@@ -149,3 +149,36 @@ export async function apiFetch<T>(
     throw new ApiError('接口返回了无法解析的响应', res.status);
   }
 }
+
+/** Authenticated binary download → browser save dialog. */
+export async function apiDownload(path: string, filename: string) {
+  const headers = new Headers();
+  const token = getToken();
+  if (token) headers.set('authorization', `Bearer ${token}`);
+
+  let res: Response;
+  try {
+    res = await fetchWithRetry(`${getApiBase()}${path}`, { headers });
+  } catch {
+    throw new ApiError(
+      '无法连接 API（Failed to fetch）。请确认 pnpm dev 中 API 已启动，并刷新页面。',
+      0,
+    );
+  }
+  if (!res.ok) {
+    throw new ApiError(res.statusText || '下载失败', res.status);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}

@@ -2,19 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import ChatMarkdown from '@/components/chat-markdown';
-import { apiFetch } from '@/lib/api';
+import { apiDownload, apiFetch } from '@/lib/api';
 import type {
   RuntimeEvent,
-  SessionArtifact,
   WorkspaceEntry,
   WorkspaceFileContent,
   WorkspaceTree,
 } from '@/lib/types';
 
-type PanelView = 'workspace' | 'artifacts';
-
 const PANEL_WIDTH_KEY = 'workally.resourcePanel.open';
-const PANEL_VIEW_KEY = 'workally.resourcePanel.view';
+
+const DELIVERABLE_RE =
+  /\.(pptx?|xlsx?|docx?|pdf|html?|md|png|jpe?g|gif|webp|svg)$/i;
 
 function formatSize(bytes?: number) {
   if (bytes == null) return '';
@@ -25,82 +24,67 @@ function formatSize(bytes?: number) {
 
 function fileIcon(name: string) {
   const lower = name.toLowerCase();
+  if (/\.(pptx?|ppt)$/.test(lower)) return 'P';
+  if (/\.(xlsx?|xls)$/.test(lower)) return 'X';
+  if (/\.(docx?|doc)$/.test(lower)) return 'W';
+  if (lower.endsWith('.pdf')) return 'PDF';
   if (lower.endsWith('.html') || lower.endsWith('.htm')) return '◇';
   if (lower.endsWith('.md')) return 'M';
   if (/\.(png|jpg|jpeg|gif|webp|svg)$/.test(lower)) return '🖼';
+  if (lower.endsWith('.py') || lower.endsWith('.js') || lower.endsWith('.ts')) return '{ }';
+  if (lower.endsWith('.json')) return '{}';
   return '·';
 }
 
-function FileTreeNode({
-  entry,
-  depth,
-  selectedPath,
-  onSelect,
-}: {
-  entry: WorkspaceEntry;
-  depth: number;
-  selectedPath: string | null;
-  onSelect: (path: string) => void;
-}) {
-  const [open, setOpen] = useState(true);
-  const isDir = entry.type === 'directory';
-  const selected = !isDir && selectedPath === entry.path;
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => {
-          if (isDir) setOpen((v) => !v);
-          else onSelect(entry.path);
-        }}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          width: '100%',
-          padding: '4px 8px',
-          paddingLeft: 8 + depth * 14,
-          border: 'none',
-          background: selected ? 'var(--accent-soft)' : 'transparent',
-          borderRadius: 8,
-          cursor: 'pointer',
-          textAlign: 'left',
-          font: 'inherit',
-          fontSize: 13,
-        }}
-      >
-        <span style={{ width: 14, color: 'var(--muted)', fontSize: 11 }}>
-          {isDir ? (open ? '▾' : '▸') : fileIcon(entry.name)}
-        </span>
-        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {entry.name}
-        </span>
-        {!isDir && entry.size != null && (
-          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-            {formatSize(entry.size)}
-          </span>
-        )}
-      </button>
-      {isDir && open && entry.children?.map((child) => (
-        <FileTreeNode
-          key={child.path}
-          entry={child}
-          depth={depth + 1}
-          selectedPath={selectedPath}
-          onSelect={onSelect}
-        />
-      ))}
-    </div>
-  );
+function isDeliverable(name: string) {
+  return DELIVERABLE_RE.test(name);
 }
 
-function FilePreview({ file }: { file: WorkspaceFileContent }) {
+function flattenFiles(entries: WorkspaceEntry[], out: WorkspaceEntry[] = []) {
+  for (const entry of entries) {
+    if (entry.type === 'file') out.push(entry);
+    else if (entry.children?.length) flattenFiles(entry.children, out);
+  }
+  return out;
+}
+
+function FilePreview({
+  file,
+  onDownload,
+  downloading,
+}: {
+  file: WorkspaceFileContent;
+  onDownload: () => void;
+  downloading: boolean;
+}) {
   const mime = file.mimeType ?? '';
+  if (file.encoding === 'base64' && mime.startsWith('image/') && file.content) {
+    return (
+      <img
+        src={`data:${mime};base64,${file.content}`}
+        alt={file.filename}
+        style={{
+          display: 'block',
+          maxWidth: '100%',
+          maxHeight: 240,
+          margin: '0 auto',
+          borderRadius: 8,
+        }}
+      />
+    );
+  }
   if (file.downloadOnly || file.isBinary) {
     return (
-      <div style={{ padding: 12, fontSize: 13, color: 'var(--muted)' }}>
-        二进制文件 · {formatSize(file.sizeBytes)} · 请下载查看
+      <div style={{ padding: 12, fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+        <div>二进制文件 · {formatSize(file.sizeBytes)}</div>
+        <button
+          type="button"
+          onClick={onDownload}
+          disabled={downloading}
+          style={downloadBtnStyle}
+        >
+          {downloading ? '下载中…' : '下载文件'}
+        </button>
       </div>
     );
   }
@@ -147,64 +131,74 @@ export default function SessionResourcePanel({
   open,
   onClose,
   liveEvents,
-  artifactBadge,
+  fileBadge,
+  refreshKey,
 }: {
   sessionId: string;
   open: boolean;
   onClose: () => void;
   liveEvents: RuntimeEvent[];
-  artifactBadge: number;
+  fileBadge: number;
+  /** Bumps when a run ends so the list reloads after late file promotion. */
+  refreshKey?: string | number;
 }) {
-  const [view, setView] = useState<PanelView>(() => {
-    if (typeof window === 'undefined') return 'workspace';
-    return (localStorage.getItem(PANEL_VIEW_KEY) as PanelView) || 'workspace';
-  });
   const [tree, setTree] = useState<WorkspaceTree | null>(null);
-  const [artifacts, setArtifacts] = useState<SessionArtifact[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [preview, setPreview] = useState<WorkspaceFileContent | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const [treeData, artifactData] = await Promise.all([
-        apiFetch<WorkspaceTree>(`/sessions/${sessionId}/workspace/tree`),
-        apiFetch<SessionArtifact[]>(`/sessions/${sessionId}/artifacts`),
-      ]);
+      const treeData = await apiFetch<WorkspaceTree>(
+        `/sessions/${sessionId}/workspace/tree`,
+      );
       setTree(treeData);
-      setArtifacts(artifactData);
+      // Keep artifacts index in sync (pptx from bash etc.) for downloads/API.
+      void apiFetch(`/sessions/${sessionId}/artifacts`).catch(() => undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载失败');
     } finally {
-      setLoading(false);
+      if (!opts?.silent) setLoading(false);
     }
   }, [sessionId]);
 
   useEffect(() => {
     if (!open) return;
     void refresh();
-  }, [open, refresh]);
-
-  useEffect(() => {
-    localStorage.setItem(PANEL_VIEW_KEY, view);
-  }, [view]);
+  }, [open, refresh, refreshKey]);
 
   const hasWorkspaceEvent = useMemo(
     () =>
       liveEvents.some((e) =>
-        ['artifact_created', 'artifact_updated', 'workspace_file_changed'].includes(e.type),
+        ['artifact_created', 'artifact_updated', 'workspace_file_changed', 'run_finished'].includes(
+          e.type,
+        ),
       ),
     [liveEvents],
   );
 
   useEffect(() => {
     if (!open || !hasWorkspaceEvent) return;
-    void refresh();
+    void refresh({ silent: true });
   }, [open, hasWorkspaceEvent, liveEvents.length, refresh]);
+
+  const files = useMemo(() => {
+    const flat = flattenFiles(tree?.entries ?? []);
+    return flat.sort((a, b) => {
+      const ad = isDeliverable(a.name) ? 0 : 1;
+      const bd = isDeliverable(b.name) ? 0 : 1;
+      if (ad !== bd) return ad - bd;
+      return a.name.localeCompare(b.name, 'zh');
+    });
+  }, [tree]);
+
+  const deliverables = files.filter((f) => isDeliverable(f.name));
+  const others = files.filter((f) => !isDeliverable(f.name));
 
   async function loadPreview(path: string) {
     setSelectedPath(path);
@@ -218,21 +212,85 @@ export default function SessionResourcePanel({
     }
   }
 
-  async function loadArtifactPreview(artifact: SessionArtifact) {
-    setSelectedPath(artifact.path);
+  async function downloadCurrent() {
+    if (!preview || !selectedPath) return;
+    setDownloading(true);
+    setError(null);
     try {
-      const file = await apiFetch<WorkspaceFileContent>(
-        `/sessions/${sessionId}/artifacts/${artifact.id}/content`,
+      await apiDownload(
+        `/sessions/${sessionId}/workspace/download?path=${encodeURIComponent(selectedPath)}`,
+        preview.filename,
       );
-      setPreview(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '预览失败');
+      setError(err instanceof Error ? err.message : '下载失败');
+    } finally {
+      setDownloading(false);
     }
   }
 
   if (!open) return null;
 
   const panelWidth = expanded ? 'min(50vw, 520px)' : 300;
+  const showInitialLoading = loading && !tree;
+
+  function renderFileRow(entry: WorkspaceEntry) {
+    const deliverable = isDeliverable(entry.name);
+    return (
+      <button
+        key={entry.path}
+        type="button"
+        onClick={() => void loadPreview(entry.path)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          width: '100%',
+          padding: '8px 10px',
+          border: 'none',
+          background: selectedPath === entry.path ? 'var(--accent-soft)' : 'transparent',
+          borderRadius: 8,
+          cursor: 'pointer',
+          textAlign: 'left',
+          font: 'inherit',
+        }}
+      >
+        <span
+          style={{
+            width: 28,
+            height: 22,
+            borderRadius: 6,
+            background: deliverable ? '#e8f0fe' : '#f1f5f9',
+            color: deliverable ? '#1a73e8' : 'var(--muted)',
+            display: 'grid',
+            placeItems: 'center',
+            fontSize: 10,
+            fontWeight: 700,
+            flexShrink: 0,
+          }}
+        >
+          {fileIcon(entry.name)}
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span
+            style={{
+              display: 'block',
+              fontSize: 13,
+              fontWeight: deliverable ? 650 : 500,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {entry.name}
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+            {entry.path}
+            {entry.size != null ? ` · ${formatSize(entry.size)}` : ''}
+          </span>
+        </span>
+      </button>
+    );
+  }
 
   return (
     <aside
@@ -253,119 +311,70 @@ export default function SessionResourcePanel({
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'flex-end',
-          padding: '8px 10px',
+          justifyContent: 'space-between',
+          padding: '10px 12px',
           borderBottom: '1px solid var(--line)',
-          gap: 4,
+          gap: 8,
         }}
       >
-        <button
-          type="button"
-          aria-label={expanded ? '缩小侧栏' : '放大侧栏'}
-          title={expanded ? '缩小' : '放大'}
-          style={iconBtnStyle}
-          onClick={() => setExpanded((v) => !v)}
-        >
-          <ExpandIcon expanded={expanded} />
-        </button>
-        <button
-          type="button"
-          aria-label="关闭侧栏"
-          title="关闭"
-          style={iconBtnStyle}
-          onClick={onClose}
-        >
-          <CloseIcon />
-        </button>
-      </div>
-
-      <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--line)' }}>
-        <select
-          value={view}
-          onChange={(e) => {
-            setView(e.target.value as PanelView);
-            setPreview(null);
-            setSelectedPath(null);
-          }}
-          style={{
-            width: '100%',
-            padding: '8px 10px',
-            borderRadius: 10,
-            border: '1px solid var(--line)',
-            background: '#f8fafc',
-            font: 'inherit',
-            fontSize: 13,
-          }}
-        >
-          <option value="workspace">工作空间文件</option>
-          <option value="artifacts">
-            会话产物{artifactBadge > 0 ? ` (${artifactBadge})` : ''}
-          </option>
-        </select>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            会话文件{fileBadge > 0 ? ` (${fileBadge})` : ''}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+            交付物优先 · 可预览或下载
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+          <button
+            type="button"
+            aria-label={expanded ? '缩小侧栏' : '放大侧栏'}
+            title={expanded ? '缩小' : '放大'}
+            style={iconBtnStyle}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            <ExpandIcon expanded={expanded} />
+          </button>
+          <button
+            type="button"
+            aria-label="关闭侧栏"
+            title="关闭"
+            style={iconBtnStyle}
+            onClick={onClose}
+          >
+            <CloseIcon />
+          </button>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 4px' }}>
-        {loading && (
+        {showInitialLoading && (
           <div style={{ padding: 12, fontSize: 13, color: 'var(--muted)' }}>加载中…</div>
         )}
         {error && (
           <div style={{ padding: 12, fontSize: 13, color: '#b42318' }}>{error}</div>
         )}
 
-        {!loading && view === 'workspace' && (
-          tree && tree.entries.length > 0 ? (
-            tree.entries.map((entry) => (
-              <FileTreeNode
-                key={entry.path}
-                entry={entry}
-                depth={0}
-                selectedPath={selectedPath}
-                onSelect={(path) => void loadPreview(path)}
-              />
-            ))
-          ) : (
-            <div style={{ padding: 12, fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
-              Agent 执行后将在此显示工作空间文件
-            </div>
-          )
+        {!showInitialLoading && files.length === 0 && (
+          <div style={{ padding: 12, fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
+            Agent 生成文件后将显示在这里
+          </div>
         )}
 
-        {!loading && view === 'artifacts' && (
-          artifacts.length > 0 ? (
-            <div style={{ display: 'grid', gap: 2 }}>
-              {artifacts.map((a) => (
-                <button
-                  key={a.id}
-                  type="button"
-                  onClick={() => void loadArtifactPreview(a)}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'flex-start',
-                    gap: 2,
-                    width: '100%',
-                    padding: '8px 10px',
-                    border: 'none',
-                    background:
-                      selectedPath === a.path ? 'var(--accent-soft)' : 'transparent',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    font: 'inherit',
-                  }}
-                >
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{a.filename}</span>
-                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-                    {a.path} · {formatSize(a.sizeBytes)}
-                  </span>
-                </button>
-              ))}
+        {!showInitialLoading && deliverables.length > 0 && (
+          <div style={{ marginBottom: 8 }}>
+            <div style={sectionLabelStyle}>交付物</div>
+            {deliverables.map(renderFileRow)}
+          </div>
+        )}
+
+        {!showInitialLoading && others.length > 0 && (
+          <div>
+            <div style={sectionLabelStyle}>
+              {deliverables.length > 0 ? '其他文件' : '文件'}
             </div>
-          ) : (
-            <div style={{ padding: 12, fontSize: 13, color: 'var(--muted)', lineHeight: 1.5 }}>
-              暂无产物，Agent 生成文件后将自动出现
-            </div>
-          )
+            {others.map(renderFileRow)}
+          </div>
         )}
       </div>
 
@@ -390,11 +399,25 @@ export default function SessionResourcePanel({
             <div style={{ fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {preview.filename}
             </div>
-            <span style={{ fontSize: 11, color: 'var(--muted)' }}>
-              {formatSize(preview.sizeBytes)}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+                {formatSize(preview.sizeBytes)}
+              </span>
+              <button
+                type="button"
+                onClick={() => void downloadCurrent()}
+                disabled={downloading}
+                style={{ ...downloadBtnStyle, padding: '4px 8px', fontSize: 11, marginTop: 0 }}
+              >
+                {downloading ? '…' : '下载'}
+              </button>
+            </div>
           </div>
-          <FilePreview file={preview} />
+          <FilePreview
+            file={preview}
+            onDownload={() => void downloadCurrent()}
+            downloading={downloading}
+          />
         </div>
       )}
     </aside>
@@ -424,6 +447,26 @@ const iconBtnStyle: CSSProperties = {
   display: 'grid',
   placeItems: 'center',
   color: 'var(--muted)',
+};
+
+const downloadBtnStyle: CSSProperties = {
+  marginTop: 8,
+  padding: '6px 12px',
+  border: '1px solid var(--line)',
+  borderRadius: 8,
+  background: '#f8fafc',
+  cursor: 'pointer',
+  font: 'inherit',
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+const sectionLabelStyle: CSSProperties = {
+  padding: '4px 10px 6px',
+  fontSize: 11,
+  fontWeight: 650,
+  color: 'var(--muted)',
+  letterSpacing: '0.02em',
 };
 
 function ExpandIcon({ expanded }: { expanded: boolean }) {

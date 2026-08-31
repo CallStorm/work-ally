@@ -10,7 +10,22 @@ import SessionResourcePanel, {
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { subscribeRunEvents } from '@/lib/sse';
-import type { ChatMessage, RuntimeEvent, SessionDetail } from '@/lib/types';
+import type {
+  ChatMessage,
+  RuntimeEvent,
+  SessionDetail,
+  WorkspaceEntry,
+  WorkspaceTree,
+} from '@/lib/types';
+
+function countWorkspaceFiles(entries: WorkspaceEntry[]): number {
+  let n = 0;
+  for (const e of entries) {
+    if (e.type === 'file') n += 1;
+    else if (e.children?.length) n += countWorkspaceFiles(e.children);
+  }
+  return n;
+}
 
 function findAssistantAfterUser(
   messages: ChatMessage[],
@@ -89,12 +104,14 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
     setMessageTraces((prev) => ({ ...prev, ...traces }));
 
     try {
-      const artifacts = await apiFetch<Array<{ id: string }>>(
-        `/sessions/${sessionId}/artifacts`,
+      // Keep artifact index reconciled (bash-created pptx etc.).
+      void apiFetch(`/sessions/${sessionId}/artifacts`).catch(() => undefined);
+      const tree = await apiFetch<WorkspaceTree>(
+        `/sessions/${sessionId}/workspace/tree`,
       );
-      setArtifactCount(artifacts.length);
+      setArtifactCount(countWorkspaceFiles(tree.entries ?? []));
     } catch {
-      // ignore artifact count errors
+      // ignore workspace count errors
     }
     return data;
   }, [sessionId]);
@@ -109,10 +126,30 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     if (!auth) return;
-    void refreshSession().catch((err) =>
-      setError(err instanceof Error ? err.message : '加载会话失败'),
-    );
-  }, [auth, refreshSession]);
+    void (async () => {
+      try {
+        const data = await refreshSession();
+        // Resume in-flight runs after navigating away (sidebar links omit ?runId=).
+        if (!initialRunId) {
+          const staleBefore = Date.now() - 2 * 60 * 60 * 1000;
+          const active = [...(data.runs ?? [])]
+            .reverse()
+            .find((r) => {
+              if (r.state !== 'running' && r.state !== 'queued') return false;
+              if (!r.createdAt) return true;
+              return new Date(r.createdAt).getTime() >= staleBefore;
+            });
+          if (active) {
+            router.replace(
+              `/workbench/sessions/${sessionId}?runId=${active.id}`,
+            );
+          }
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : '加载会话失败');
+      }
+    })();
+  }, [auth, refreshSession, initialRunId, router, sessionId]);
 
   useEffect(() => {
     // Scroll only within the chat pane — never the page / sidebar
@@ -172,6 +209,13 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
         );
       } catch (err) {
         if (!cancelled && (err as Error).name !== 'AbortError') {
+          setError(
+            err instanceof Error
+              ? err.message.includes('SSE') || err.message.includes('fetch')
+                ? '任务连接中断（API 可能刚重启）。请刷新页面后重新发送。'
+                : err.message
+              : '运行失败',
+          );
           try {
             await refreshSession();
           } catch (refreshErr) {
@@ -186,7 +230,13 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
         if (!cancelled) {
           setBusy(false);
           try {
-            await refreshSession();
+            const data = await refreshSession();
+            const run = data.runs?.find((r) => r.id === initialRunId);
+            if (run?.state === 'running' || run?.state === 'queued') {
+              setError(
+                '任务仍显示执行中但连接已断开，请刷新后重新发送。',
+              );
+            }
           } catch (err) {
             setError(
               err instanceof Error ? err.message : '刷新会话失败',
@@ -198,6 +248,7 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
     return () => {
       cancelled = true;
       ac.abort();
+      setBusy(false);
     };
   }, [auth, initialRunId, refreshSession]);
 
@@ -256,7 +307,7 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
             type="button"
             className={`session-chat__panel-btn${panelOpen ? ' is-open' : ''}`}
             aria-label={panelOpen ? '收起资源侧栏' : '打开资源侧栏'}
-            title="工作空间文件与会话产物"
+            title="会话文件"
             onClick={togglePanel}
           >
             <PanelToggleIcon />
@@ -342,7 +393,8 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
         open={panelOpen}
         onClose={() => setPanelOpen(false)}
         liveEvents={events}
-        artifactBadge={artifactCount}
+        fileBadge={artifactCount}
+        refreshKey={busy ? 'running' : `idle-${artifactCount}`}
       />
     </div>
   );

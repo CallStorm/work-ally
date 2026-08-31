@@ -126,11 +126,26 @@ export default function WorkbenchShell({
 
   useEffect(() => {
     if (!currentGroupId) return;
-    void apiFetch<SessionListItem[]>(
-      `/sessions?group_id=${currentGroupId}`,
-    )
-      .then(setSessions)
-      .catch(() => setSessions([]));
+    let cancelled = false;
+
+    async function loadSessions() {
+      try {
+        const rows = await apiFetch<SessionListItem[]>(
+          `/sessions?group_id=${currentGroupId}`,
+        );
+        if (!cancelled) setSessions(rows);
+      } catch {
+        if (!cancelled) setSessions([]);
+      }
+    }
+
+    void loadSessions();
+    // Poll so in-progress runs show up while user stays on the page.
+    const timer = window.setInterval(() => void loadSessions(), 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
   }, [currentGroupId, pathname]);
 
   const activeSessionId = useMemo(() => {
@@ -244,16 +259,24 @@ export default function WorkbenchShell({
               {previewSessions.map((s) => {
                 const title = s.title || '未命名会话';
                 const active = activeSessionId === s.id;
+                const running =
+                  s.activeRun?.state === 'running' ||
+                  s.activeRun?.state === 'queued';
                 return (
                   <Link
                     key={s.id}
                     href={`/workbench/sessions/${s.id}`}
-                    className={`workbench-history__item${active ? ' is-active' : ''}`}
-                    title={title}
+                    className={`workbench-history__item${active ? ' is-active' : ''}${running ? ' is-running' : ''}`}
+                    title={running ? `${title}（执行中）` : title}
                   >
-                    <span className="workbench-history__title">{title}</span>
+                    <span className="workbench-history__title">
+                      {running && (
+                        <span className="workbench-history__pulse" aria-hidden />
+                      )}
+                      {title}
+                    </span>
                     <span className="workbench-history__time">
-                      {formatRelativeTime(s.updatedAt)}
+                      {running ? '执行中' : formatRelativeTime(s.updatedAt)}
                     </span>
                   </Link>
                 );
@@ -460,6 +483,9 @@ export default function WorkbenchShell({
               )}
               {filteredSessions.map((s) => {
                 const title = s.title || '未命名会话';
+                const running =
+                  s.activeRun?.state === 'running' ||
+                  s.activeRun?.state === 'queued';
                 return (
                   <button
                     key={s.id}
@@ -469,7 +495,7 @@ export default function WorkbenchShell({
                   >
                     <span>{title}</span>
                     <span className="workbench-history__time">
-                      {formatRelativeTime(s.updatedAt)}
+                      {running ? '执行中' : formatRelativeTime(s.updatedAt)}
                     </span>
                   </button>
                 );

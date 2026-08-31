@@ -41,6 +41,8 @@ export class ArtifactPromotionListener implements OnModuleInit {
       }
 
       if (event.type === 'run_finished' && event.data?.state === 'succeeded') {
+        // RuntimeService already promotes before emitting run_finished.
+        // Keep a quiet reconcile for older callers / missed paths.
         const session = await this.prisma.session.findUnique({
           where: { id: event.sessionId },
           select: { tenantId: true },
@@ -50,6 +52,7 @@ export class ArtifactPromotionListener implements OnModuleInit {
           runId: event.runId,
           sessionId: event.sessionId,
           tenantId: session.tenantId,
+          emitEvents: false,
         });
       }
     } catch (err) {

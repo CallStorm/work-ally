@@ -19,7 +19,7 @@ export class SessionsService {
   ) {}
 
   async list(user: AuthUser, groupId?: string) {
-    return this.prisma.session.findMany({
+    const sessions = await this.prisma.session.findMany({
       where: {
         tenantId: user.tenantId,
         createdBy: user.userId,
@@ -29,7 +29,25 @@ export class SessionsService {
       take: 50,
       include: {
         expert: { select: { id: true, name: true } },
+        runs: {
+          where: { state: { in: ['queued', 'running'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { id: true, state: true, createdAt: true },
+        },
       },
+    });
+    const staleBefore = Date.now() - 2 * 60 * 60 * 1000;
+    return sessions.map(({ runs, ...session }) => {
+      const run = runs[0];
+      const fresh =
+        run && new Date(run.createdAt).getTime() >= staleBefore ? run : null;
+      return {
+        ...session,
+        activeRun: fresh
+          ? { id: fresh.id, state: fresh.state, createdAt: fresh.createdAt }
+          : null,
+      };
     });
   }
 

@@ -25,25 +25,24 @@ export class ArtifactService {
       where: { sessionId },
       orderBy: { updatedAt: 'desc' },
     });
-    // Backfill: workspace has files but artifacts empty (legacy runs)
-    if (rows.length === 0) {
-      const latestRun = await this.prisma.agentRun.findFirst({
-        where: { sessionId },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true },
+    const latestRun = await this.prisma.agentRun.findFirst({
+      where: { sessionId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (latestRun) {
+      // Always reconcile so bash-created files (pptx etc.) appear even when
+      // some artifacts already exist from write/edit promotion.
+      await this.scanWorkspaceAndPromote({
+        runId: latestRun.id,
+        sessionId,
+        tenantId: session.tenantId,
+        emitEvents: false,
       });
-      if (latestRun) {
-        await this.scanWorkspaceAndPromote({
-          runId: latestRun.id,
-          sessionId,
-          tenantId: session.tenantId,
-          emitEvents: false,
-        });
-        rows = await this.prisma.sessionArtifact.findMany({
-          where: { sessionId },
-          orderBy: { updatedAt: 'desc' },
-        });
-      }
+      rows = await this.prisma.sessionArtifact.findMany({
+        where: { sessionId },
+        orderBy: { updatedAt: 'desc' },
+      });
     }
     return rows;
   }
@@ -55,6 +54,28 @@ export class ArtifactService {
     });
     if (!artifact) return null;
     return this.workspace.readFile(user, sessionId, artifact.path);
+  }
+
+  async resolveForDownload(
+    user: AuthUser,
+    sessionId: string,
+    artifactId: string,
+  ) {
+    await this.workspace.assertSessionAccess(user, sessionId);
+    const artifact = await this.prisma.sessionArtifact.findFirst({
+      where: { id: artifactId, sessionId },
+    });
+    if (!artifact) return null;
+    const file = await this.workspace.resolveFile(
+      user,
+      sessionId,
+      artifact.path,
+    );
+    return {
+      abs: file.abs,
+      filename: artifact.filename || file.filename,
+      mimeType: artifact.mimeType ?? file.mimeType,
+    };
   }
 
   async handleToolResult(input: {

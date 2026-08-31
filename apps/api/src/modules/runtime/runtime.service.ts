@@ -1,13 +1,20 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RuntimeEventsService } from './runtime-events.service';
 import { MastraRunnerService } from './mastra-runner.service';
 import { PiRunnerService } from './pi-runner.service';
 import { CapabilityBundleService } from './capability-bundle.service';
+import { ArtifactService } from '../workspace/artifact.service';
 
 @Injectable()
-export class RuntimeService {
+export class RuntimeService implements OnModuleInit {
   private readonly logger = new Logger(RuntimeService.name);
 
   constructor(
@@ -17,8 +24,24 @@ export class RuntimeService {
     private readonly piRunner: PiRunnerService,
     private readonly capabilities: CapabilityBundleService,
     private readonly config: ConfigService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
+  /** Runs left in queued/running die with the previous Node process — free them on boot. */
+  async onModuleInit() {
+    const result = await this.prisma.agentRun.updateMany({
+      where: { state: { in: ['queued', 'running'] } },
+      data: {
+        state: 'failed',
+        errorSummary: '进程重启，任务中断（请重新发送）',
+      },
+    });
+    if (result.count > 0) {
+      this.logger.warn(
+        `Marked ${result.count} orphaned queued/running run(s) as failed after restart`,
+      );
+    }
+  }
   resolveEngine(): 'pi' | 'mastra' | 'mock' {
     const forced = this.config.get<string>('RUNTIME_PROVIDER');
     if (forced === 'mock' || forced === 'mastra' || forced === 'pi') {
@@ -127,6 +150,14 @@ export class RuntimeService {
         content: result.text,
         provider: result.provider,
       });
+
+      // Promote bash-created files BEFORE run_finished so SSE clients still see them.
+      await this.promoteWorkspaceArtifacts(
+        runId,
+        run.sessionId,
+        run.session.tenantId,
+      );
+
       this.events.emit('run_finished', runId, run.sessionId, {
         state: 'succeeded',
         stepsCount: result.stepsCount,
@@ -146,6 +177,26 @@ export class RuntimeService {
         state: 'failed',
       });
       throw error;
+    }
+  }
+
+  private async promoteWorkspaceArtifacts(
+    runId: string,
+    sessionId: string,
+    tenantId: string,
+  ) {
+    try {
+      const artifacts = this.moduleRef.get(ArtifactService, { strict: false });
+      await artifacts.scanWorkspaceAndPromote({
+        runId,
+        sessionId,
+        tenantId,
+        emitEvents: true,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `Workspace artifact promotion skipped: ${String(err)}`,
+      );
     }
   }
 

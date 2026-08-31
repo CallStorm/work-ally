@@ -61,6 +61,14 @@ export class PiRunnerService {
     const sandbox = this.paths.ensureDir(
       this.paths.sessionWorkspaceDir(input.tenantId, input.sessionId),
     );
+    // Windows default code page (e.g. GBK) mangles Chinese when agents do
+    // `python script.py > out.json` or open() without encoding=utf-8.
+    // Force UTF-8 for child shells/Python spawned by Pi tools.
+    process.env.PYTHONUTF8 = '1';
+    process.env.PYTHONIOENCODING = 'utf-8';
+    if (process.platform === 'win32') {
+      process.env.PYTHONLEGACYWINDOWSSTDIO = '0';
+    }
     const agentDir = this.paths.ensureDir(path.join(sandbox, '.pi-agent'));
     const modelsPath = path.join(agentDir, 'models.json');
     this.paths.writeModelsJson(modelsPath, {
@@ -129,6 +137,9 @@ export class PiRunnerService {
             ? 'Remote MCP tools are mounted (names start with mcp_). Use them for external systems like 简道云 — never claim you lack access when these tools exist.'
             : '',
           'bash/write/edit/read are available inside the sandbox cwd.',
+          'Encoding (important on Windows): prefer writing UTF-8 files explicitly',
+          '(e.g. open(path, "w", encoding="utf-8") or officecli batch --input file.json).',
+          'Avoid `python … > out.json` / stdin redirects for Chinese content — they may use the system ANSI code page.',
         ]
           .filter(Boolean)
           .join('\n'),

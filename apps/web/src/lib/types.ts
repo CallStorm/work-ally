@@ -51,6 +51,7 @@ export type WorkspaceFileContent = {
   mimeType: string | null;
   sizeBytes: number;
   content?: string;
+  encoding?: 'utf8' | 'base64';
   isBinary?: boolean;
   downloadOnly?: boolean;
 };
@@ -86,4 +87,5 @@ export type SessionListItem = {
   title: string | null;
   updatedAt: string;
   expert: { id: string; name: string } | null;
+  activeRun?: { id: string; state: string; createdAt?: string } | null;
 };
