@@ -5,10 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { BazaarProduct, Prisma } from '@prisma/client';
-import type {
-  PatchBazaarProductInput,
-  PolishBazaarProductOverrideInput,
-  UpsertBazaarProductInput,
+import {
+  PolishBazaarProductSchema,
+  type PatchBazaarProductInput,
+  type PolishBazaarProductOverrideInput,
+  type UpsertBazaarProductInput,
 } from '@work-ally/shared';
 import { PrismaService } from '../../../prisma/prisma.service';
 import type { AuthUser } from '../../../common/current-user.decorator';
@@ -145,32 +146,41 @@ export class BazaarProductsService {
   }
 
   async publish(user: AuthUser, id: string) {
-    const product = await this.getOwned(user, id);
-    if (!product.title.trim() || !product.pitch.trim()) {
+    const owned = await this.getOwned(user, id);
+    if (!owned.title.trim() || !owned.pitch.trim()) {
       throw new BadRequestException('上架需要填写名称和卖点');
     }
 
-    if (product.status !== 'published') {
-      const publishedCount = await this.prisma.bazaarProduct.count({
-        where: {
-          tenantId: user.tenantId,
-          companyId: product.companyId,
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM bazaar_companies WHERE id = ${owned.companyId} FOR UPDATE`;
+
+      const product = await tx.bazaarProduct.findFirst({
+        where: { id, tenantId: user.tenantId, userId: user.userId },
+      });
+      if (!product) throw new NotFoundException('产品不存在');
+
+      if (product.status !== 'published') {
+        const publishedCount = await tx.bazaarProduct.count({
+          where: {
+            tenantId: user.tenantId,
+            companyId: product.companyId,
+            status: 'published',
+          },
+        });
+        if (publishedCount >= PUBLISHED_SHELF_LIMIT) {
+          throw new BadRequestException('货架最多 8 件，请先下架');
+        }
+      }
+
+      await tx.bazaarProduct.update({
+        where: { id: product.id },
+        data: {
           status: 'published',
+          publishedAt: product.publishedAt ?? new Date(),
         },
       });
-      if (publishedCount >= PUBLISHED_SHELF_LIMIT) {
-        throw new BadRequestException('货架最多 8 件，请先下架');
-      }
-    }
-
-    await this.prisma.bazaarProduct.update({
-      where: { id: product.id },
-      data: {
-        status: 'published',
-        publishedAt: product.publishedAt ?? new Date(),
-      },
+      return this.recomputeFromDb(product.id, tx);
     });
-    return this.recomputeFromDb(product.id);
   }
 
   async unpublish(user: AuthUser, id: string) {
@@ -221,13 +231,16 @@ export class BazaarProductsService {
     return parsePolishResult(assistantText);
   }
 
-  async recomputeFromDb(productId: string) {
-    const ratings = await this.prisma.bazaarRating.findMany({
+  async recomputeFromDb(
+    productId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ) {
+    const ratings = await db.bazaarRating.findMany({
       where: { productId },
       select: { stars: true },
     });
     const computed = scoreFromStars(ratings.map((r) => r.stars));
-    const row = await this.prisma.bazaarProduct.update({
+    const row = await db.bazaarProduct.update({
       where: { id: productId },
       data: {
         score: computed.score,
@@ -260,20 +273,9 @@ function parsePolishResult(raw: string): {
     }
   }
 
-  if (!parsed || typeof parsed !== 'object') {
+  const result = PolishBazaarProductSchema.safeParse(parsed);
+  if (!result.success) {
     throw new BadRequestException('润色结果无法解析');
   }
-  const obj = parsed as Record<string, unknown>;
-  if (typeof obj.title !== 'string' || typeof obj.pitch !== 'string') {
-    throw new BadRequestException('润色结果无法解析');
-  }
-  if (!Array.isArray(obj.features) || obj.features.some((item) => typeof item !== 'string')) {
-    throw new BadRequestException('润色结果无法解析');
-  }
-
-  return {
-    title: obj.title,
-    pitch: obj.pitch,
-    features: obj.features,
-  };
+  return result.data;
 }

@@ -283,7 +283,11 @@ export function MyStall({ company, onCompanyChange, onOpenProduct }: Props) {
                   <button
                     type="button"
                     className="bazaar-btn bazaar-btn--sm"
-                    disabled={busyId === item.id}
+                    disabled={
+                      item.status === 'published'
+                        ? busyId === item.id
+                        : busyId !== null
+                    }
                     onClick={() => void togglePublish(item)}
                   >
                     {item.status === 'published' ? '下架' : '上架'}

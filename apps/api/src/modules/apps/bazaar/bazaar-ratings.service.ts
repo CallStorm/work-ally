@@ -18,11 +18,14 @@ export class BazaarRatingsService {
     if (product.userId === user.userId) {
       throw new ForbiddenException('不能给自己的产品打星');
     }
-    await this.prisma.bazaarRating.upsert({
-      where: { productId_userId: { productId, userId: user.userId } },
-      create: { tenantId: user.tenantId, productId, userId: user.userId, stars },
-      update: { stars },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM bazaar_products WHERE id = ${productId} FOR UPDATE`;
+      await tx.bazaarRating.upsert({
+        where: { productId_userId: { productId, userId: user.userId } },
+        create: { tenantId: user.tenantId, productId, userId: user.userId, stars },
+        update: { stars },
+      });
+      return this.products.recomputeFromDb(productId, tx);
     });
-    return this.products.recomputeFromDb(productId);
   }
 }
