@@ -7,7 +7,7 @@ import {
 import type { BazaarProduct, Prisma } from '@prisma/client';
 import type {
   PatchBazaarProductInput,
-  PolishBazaarProductInput,
+  PolishBazaarProductOverrideInput,
   UpsertBazaarProductInput,
 } from '@work-ally/shared';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -178,13 +178,16 @@ export class BazaarProductsService {
   async polish(
     user: AuthUser,
     productId: string,
-    override?: PolishBazaarProductInput,
+    override?: PolishBazaarProductOverrideInput,
   ) {
     const product = await this.getOwned(user, productId);
     const current = serializeProduct(product);
-    const title = override?.title ?? current.title;
-    const pitch = override?.pitch ?? current.pitch;
-    const features = override?.features ?? current.features;
+    const title =
+      override && 'title' in override ? override.title : current.title;
+    const pitch =
+      override && 'pitch' in override ? override.pitch : current.pitch;
+    const features =
+      override && 'features' in override ? override.features : current.features;
 
     const app = await this.registry.getBazaarForUser(user);
     const modelConfigId = app?.defaultModelConfigId ?? null;

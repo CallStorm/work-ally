@@ -237,12 +237,27 @@ export const RateBazaarProductSchema = z.object({
 });
 export type RateBazaarProductInput = z.infer<typeof RateBazaarProductSchema>;
 
-export const PolishBazaarProductSchema = z.object({
+const polishBazaarProductFields = {
   title: z.string().trim().min(1).max(80),
   pitch: z.string().trim().min(1).max(2000),
-  features: z.array(z.string().trim().min(1).max(40)).max(8).optional().default([]),
+  features: z.array(z.string().trim().min(1).max(40)).max(8),
+};
+
+export const PolishBazaarProductSchema = z.object({
+  title: polishBazaarProductFields.title,
+  pitch: polishBazaarProductFields.pitch,
+  features: polishBazaarProductFields.features.optional().default([]),
 });
 export type PolishBazaarProductInput = z.infer<typeof PolishBazaarProductSchema>;
+
+export const PolishBazaarProductOverrideSchema = z.object({
+  title: polishBazaarProductFields.title.optional(),
+  pitch: polishBazaarProductFields.pitch.optional(),
+  features: polishBazaarProductFields.features.optional(),
+});
+export type PolishBazaarProductOverrideInput = z.infer<
+  typeof PolishBazaarProductOverrideSchema
+>;
 
 export const UpdateAppRegistrySchema = z.object({
   enabled: z.boolean().optional(),

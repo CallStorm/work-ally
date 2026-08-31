@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   PatchBazaarProductSchema,
-  PolishBazaarProductSchema,
+  PolishBazaarProductOverrideSchema,
   RateBazaarProductSchema,
   UpsertBazaarCompanySchema,
   UpsertBazaarProductSchema,
@@ -108,7 +108,7 @@ export class BazaarController {
       body != null &&
       typeof body === 'object' &&
       Object.keys(body as object).length > 0
-        ? parseBody(PolishBazaarProductSchema, body)
+        ? parseBody(PolishBazaarProductOverrideSchema, body)
         : undefined;
     return this.products.polish(user, id, override);
   }
