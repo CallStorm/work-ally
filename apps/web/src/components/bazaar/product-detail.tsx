@@ -51,6 +51,7 @@ export function ProductDetail({
       );
       if (requestId !== fetchIdRef.current) return;
       setProduct(next);
+      setMyStars(next.myStars ?? 0);
       try {
         const co = await apiFetch<BazaarCompany>(
           `/apps/bazaar/company/${next.userId}`,

@@ -39,6 +39,7 @@ export type BazaarProduct = {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  myStars?: number | null;
 };
 
 export type BazaarMarketItem = BazaarProduct & {

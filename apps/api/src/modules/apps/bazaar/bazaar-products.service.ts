@@ -84,7 +84,14 @@ export class BazaarProductsService {
     if (row.status !== 'published' && row.userId !== user.userId) {
       throw new NotFoundException('产品不存在');
     }
-    return serializeProduct(row);
+    const base = serializeProduct(row);
+    if (row.userId === user.userId) {
+      return { ...base, myStars: null };
+    }
+    const rating = await this.prisma.bazaarRating.findUnique({
+      where: { productId_userId: { productId: id, userId: user.userId } },
+    });
+    return { ...base, myStars: rating?.stars ?? null };
   }
 
   async create(user: AuthUser, input: UpsertBazaarProductInput) {
