@@ -5,6 +5,7 @@ import { ModelsModule } from '../models/models.module';
 import { AppRegistryService } from './app-registry.service';
 import { AppsController } from './apps.controller';
 import { AdminAppsController } from './admin-apps.controller';
+import { BazaarAppGuard } from './bazaar-app.guard';
 import { NotesAppGuard } from './notes-app.guard';
 import { NotesController } from './notes/notes.controller';
 import { HandbookCategoriesService } from './notes/handbook-categories.service';
@@ -28,6 +29,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     AppRegistryService,
     StickiesAppGuard,
     NotesAppGuard,
+    BazaarAppGuard,
     HandbookCategoriesService,
     HandbookNotesService,
     NotesAiService,
