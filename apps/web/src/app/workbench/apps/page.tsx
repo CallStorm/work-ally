@@ -28,12 +28,10 @@ export default function AppsListPage() {
         {apps.map((app) => {
           const isStickies = app.slug === 'stickies';
           const isNotes = app.slug === 'notes';
-          const isBazaar = app.slug === 'bazaar';
           const cardClass = [
             'apps-list-page__card',
             isStickies ? 'apps-list-page__card--stickies' : '',
             isNotes ? 'apps-list-page__card--handbook' : '',
-            isBazaar ? 'apps-list-page__card--bazaar' : '',
           ]
             .filter(Boolean)
             .join(' ');
@@ -51,8 +49,6 @@ export default function AppsListPage() {
                 <div className="apps-list-page__cover" aria-hidden>
                   <span className="apps-list-page__book" />
                 </div>
-              ) : isBazaar ? (
-                <div className="apps-list-page__cover" aria-hidden />
               ) : (
                 <span className="apps-list-page__icon">◆</span>
               )}
@@ -64,9 +60,6 @@ export default function AppsListPage() {
                 )}
                 {isNotes && (
                   <span className="apps-list-page__meta">分类 · Markdown · 搜索 · AI</span>
-                )}
-                {isBazaar && (
-                  <span className="apps-list-page__meta">摊位 · 打星 · 产品榜</span>
                 )}
               </div>
             </Link>

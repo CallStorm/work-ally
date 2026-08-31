@@ -140,5 +140,12 @@ export async function apiFetch<T>(
     throw new ApiError(message, res.status);
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // Nest `return null` yields an empty 200 body — treat as null, not JSON parse error.
+  const text = await res.text();
+  if (!text) return null as T;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new ApiError('接口返回了无法解析的响应', res.status);
+  }
 }

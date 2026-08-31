@@ -108,9 +108,6 @@ model Tenant {
   handbookCategories HandbookCategory[]
   handbookNotes      HandbookNote[]
   notesAiThreads     NotesAiThread[]
-  bazaarCompanies    BazaarCompany[]
-  bazaarProducts     BazaarProduct[]
-  bazaarRatings      BazaarRating[]
 
   @@map("tenants")
 }
@@ -643,67 +640,4 @@ model NotesAiMessage {
 
   @@index([threadId, createdAt])
   @@map("notes_ai_messages")
-}
-
-model BazaarCompany {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
-  userId    String   @map("user_id")
-  name      String   @db.VarChar(64)
-  slogan    String   @default("") @db.VarChar(120)
-  stallSkin String   @default("neon-blue") @map("stall_skin") @db.VarChar(32)
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  products BazaarProduct[]
-
-  @@unique([tenantId, userId])
-  @@index([tenantId])
-  @@map("bazaar_companies")
-}
-
-model BazaarProduct {
-  id           String    @id @default(cuid())
-  tenantId     String    @map("tenant_id")
-  companyId    String    @map("company_id")
-  userId       String    @map("user_id")
-  title        String    @db.VarChar(80)
-  pitch        String    @db.Text
-  featuresJson String    @default("[]") @map("features_json") @db.Text
-  coverHue     Int       @default(210) @map("cover_hue")
-  status       String    @default("draft") @db.VarChar(16)
-  score        Int       @default(0)
-  ratingCount  Int       @default(0) @map("rating_count")
-  avgStars     Decimal   @default(0) @map("avg_stars") @db.Decimal(3, 2)
-  publishedAt  DateTime? @map("published_at")
-  createdAt    DateTime  @default(now()) @map("created_at")
-  updatedAt    DateTime  @updatedAt @map("updated_at")
-
-  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  company BazaarCompany  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  ratings BazaarRating[]
-
-  @@index([tenantId, status, publishedAt])
-  @@index([tenantId, status, score])
-  @@index([tenantId, companyId])
-  @@index([tenantId, userId])
-  @@map("bazaar_products")
-}
-
-model BazaarRating {
-  id        String   @id @default(cuid())
-  tenantId  String   @map("tenant_id")
-  productId String   @map("product_id")
-  userId    String   @map("user_id")
-  stars     Int
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  product BazaarProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
-
-  @@unique([productId, userId])
-  @@index([tenantId, productId])
-  @@map("bazaar_ratings")
 }

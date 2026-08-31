@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { BAZAAR_SLUG, NOTES_SLUG, STICKIES_SLUG } from '@work-ally/shared';
+import { NOTES_SLUG, STICKIES_SLUG } from '@work-ally/shared';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -29,18 +29,6 @@ export const NOTES_DEFAULT = {
   name: '笔记',
 
   description: '个人工作笔记：分类、富文本、搜索与 AI 改稿',
-
-};
-
-
-
-export const BAZAAR_DEFAULT = {
-
-  slug: BAZAAR_SLUG,
-
-  name: '创司集市',
-
-  description: '一人一司的虚拟 AI 产品展会：摆摊、逛展、打星冲榜',
 
 };
 
@@ -173,31 +161,11 @@ export class AppRegistryService {
     await this.prisma.appRegistry.delete({ where: { id: legacy.id } });
   }
 
-  async ensureBazaar(tenantId: string, ownerUserId: string) {
-    const existing = await this.prisma.appRegistry.findUnique({
-      where: { tenantId_slug: { tenantId, slug: BAZAAR_SLUG } },
-    });
-    if (existing) return existing;
-    return this.prisma.appRegistry.create({
-      data: {
-        tenantId,
-        slug: BAZAAR_SLUG,
-        name: BAZAAR_DEFAULT.name,
-        description: BAZAAR_DEFAULT.description,
-        ownerUserId,
-        visibility: 'tenant',
-        enabled: true,
-      },
-    });
-  }
-
   async listForAdmin(tenantId: string, ownerUserId: string) {
 
     await this.ensureStickies(tenantId, ownerUserId);
 
     await this.ensureNotes(tenantId, ownerUserId);
-
-    await this.ensureBazaar(tenantId, ownerUserId);
 
     const rows = await this.prisma.appRegistry.findMany({
 
@@ -236,8 +204,6 @@ export class AppRegistryService {
     await this.ensureStickies(user.tenantId, ownerId);
 
     await this.ensureNotes(user.tenantId, ownerId);
-
-    await this.ensureBazaar(user.tenantId, ownerId);
 
 
 
@@ -303,18 +269,6 @@ export class AppRegistryService {
 
   }
 
-  async getBazaarForUser(user: AuthUser) {
-    const admin = await this.prisma.membership.findFirst({
-      where: { tenantId: user.tenantId, role: 'admin', status: 'active' },
-      select: { userId: true },
-    });
-    await this.ensureBazaar(user.tenantId, admin?.userId ?? user.userId);
-    const app = await this.getBySlug(user.tenantId, BAZAAR_SLUG);
-    if (!app || !app.enabled) return null;
-    const ok = await this.acl.canUse(user, 'apps', app);
-    return ok ? app : null;
-  }
-
   async getStickiesAdmin(tenantId: string) {
 
     const admin = await this.prisma.membership.findFirst({
@@ -347,15 +301,6 @@ export class AppRegistryService {
 
     return this.ensureNotes(tenantId, admin.userId);
 
-  }
-
-  async getBazaarAdmin(tenantId: string) {
-    const admin = await this.prisma.membership.findFirst({
-      where: { tenantId, role: 'admin', status: 'active' },
-      select: { userId: true },
-    });
-    if (!admin) return null;
-    return this.ensureBazaar(tenantId, admin.userId);
   }
 
   async updateStickies(
@@ -422,23 +367,6 @@ export class AppRegistryService {
 
     });
 
-  }
-
-  async updateBazaar(
-    tenantId: string,
-    body: {
-      enabled?: boolean;
-      defaultModelConfigId?: string | null;
-      aiActionsEnabled?: string[];
-      visibility?: 'private' | 'restricted' | 'tenant';
-    },
-  ) {
-    const app = await this.getBazaarAdmin(tenantId);
-    if (!app) return null;
-    return this.prisma.appRegistry.update({
-      where: { id: app.id },
-      data: body,
-    });
   }
 
   serialize(row: {

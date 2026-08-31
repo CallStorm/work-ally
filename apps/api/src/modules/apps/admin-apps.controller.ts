@@ -8,7 +8,6 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
-  BAZAAR_SLUG,
   NOTES_SLUG,
   STICKIES_SLUG,
   UpdateAppRegistrySchema,
@@ -38,9 +37,6 @@ export class AdminAppsController {
     if (slug === NOTES_SLUG) {
       await this.registry.ensureNotes(user.tenantId, user.userId);
     }
-    if (slug === BAZAAR_SLUG) {
-      await this.registry.ensureBazaar(user.tenantId, user.userId);
-    }
     const app = await this.registry.getBySlug(user.tenantId, slug);
     if (!app) throw new NotFoundException('应用不存在');
     const entries = await this.acl.getAcl(user, 'apps', app.id);
@@ -57,23 +53,14 @@ export class AdminAppsController {
     @Param('slug') slug: string,
     @Body() body: unknown,
   ) {
-    if (
-      slug !== STICKIES_SLUG &&
-      slug !== NOTES_SLUG &&
-      slug !== BAZAAR_SLUG
-    ) {
+    if (slug !== STICKIES_SLUG && slug !== NOTES_SLUG) {
       throw new NotFoundException('应用不存在');
-    }
-    if (slug === BAZAAR_SLUG) {
-      await this.registry.ensureBazaar(user.tenantId, user.userId);
     }
     const input = parseBody(UpdateAppRegistrySchema, body);
     const app =
       slug === STICKIES_SLUG
         ? await this.registry.updateStickies(user.tenantId, input)
-        : slug === NOTES_SLUG
-          ? await this.registry.updateNotes(user.tenantId, input)
-          : await this.registry.updateBazaar(user.tenantId, input);
+        : await this.registry.updateNotes(user.tenantId, input);
     if (!app) throw new NotFoundException('应用不存在');
     return this.registry.serialize(app);
   }

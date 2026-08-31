@@ -5,12 +5,6 @@ import { ModelsModule } from '../models/models.module';
 import { AppRegistryService } from './app-registry.service';
 import { AppsController } from './apps.controller';
 import { AdminAppsController } from './admin-apps.controller';
-import { BazaarAppGuard } from './bazaar-app.guard';
-import { BazaarController } from './bazaar/bazaar.controller';
-import { BazaarCompanyService } from './bazaar/bazaar-company.service';
-import { BazaarMarketService } from './bazaar/bazaar-market.service';
-import { BazaarProductsService } from './bazaar/bazaar-products.service';
-import { BazaarRatingsService } from './bazaar/bazaar-ratings.service';
 import { NotesAppGuard } from './notes-app.guard';
 import { NotesController } from './notes/notes.controller';
 import { HandbookCategoriesService } from './notes/handbook-categories.service';
@@ -29,17 +23,11 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     AdminAppsController,
     TasksController,
     NotesController,
-    BazaarController,
   ],
   providers: [
     AppRegistryService,
     StickiesAppGuard,
     NotesAppGuard,
-    BazaarAppGuard,
-    BazaarCompanyService,
-    BazaarProductsService,
-    BazaarRatingsService,
-    BazaarMarketService,
     HandbookCategoriesService,
     HandbookNotesService,
     NotesAiService,
