@@ -40,6 +40,7 @@ export function MarketHall({
     const requestId = ++fetchIdRef.current;
     setLoading(true);
     setError(null);
+    setItems([]);
     try {
       const next = await apiFetch<BazaarMarketItem[]>(
         `/apps/bazaar/market?sort=${sort}`,
@@ -122,7 +123,7 @@ export function MarketHall({
           。
         </div>
       )}
-      {!loading && items.length > 0 && (
+      {!loading && !error && items.length > 0 && (
         <ul className="bazaar-market__grid">
           {items.map((item) => (
             <li key={item.id}>

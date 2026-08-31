@@ -4047,6 +4047,329 @@ body.is-dragging-task .task-chip {
   background: transparent;
 }
 
+.bazaar-btn--sm {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.bazaar-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.bazaar-field textarea {
+  border: 1px solid var(--bazaar-line);
+  background: #0c1220;
+  color: var(--bazaar-ink);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: vertical;
+  min-height: 110px;
+}
+
+.bazaar-field textarea:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+}
+
+.bazaar-field input[type='range'] {
+  accent-color: var(--bazaar-neon);
+}
+
+.bazaar-stall {
+  padding: 8px 20px 28px;
+}
+
+.bazaar-stall > .bazaar-text-link {
+  margin-bottom: 12px;
+  color: var(--bazaar-muted);
+}
+
+.bazaar-stall__company {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--bazaar-line);
+  margin-bottom: 14px;
+}
+
+.bazaar-stall__company--neon-blue {
+  background: linear-gradient(90deg, rgba(30, 58, 138, 0.28), rgba(14, 165, 233, 0.18));
+}
+
+.bazaar-stall__company--violet-pulse {
+  background: linear-gradient(90deg, rgba(76, 29, 149, 0.28), rgba(167, 139, 250, 0.18));
+}
+
+.bazaar-stall__company--cyan-grid {
+  background: linear-gradient(90deg, rgba(8, 145, 178, 0.24), rgba(34, 211, 238, 0.16));
+}
+
+.bazaar-stall__company--magenta-flare {
+  background: linear-gradient(90deg, rgba(162, 28, 175, 0.24), rgba(244, 114, 182, 0.16));
+}
+
+.bazaar-stall__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.bazaar-stall__avatar--neon-blue {
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+}
+
+.bazaar-stall__avatar--violet-pulse {
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+}
+
+.bazaar-stall__avatar--cyan-grid {
+  background: linear-gradient(135deg, #0891b2, #22d3ee);
+}
+
+.bazaar-stall__avatar--magenta-flare {
+  background: linear-gradient(135deg, #c026d3, #f472b6);
+}
+
+.bazaar-stall__company-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.bazaar-stall__company-copy h1 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.bazaar-stall__company-copy p {
+  margin: 4px 0 0;
+  color: var(--bazaar-muted);
+  font-size: 13px;
+}
+
+.bazaar-stall__company-form {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--bazaar-line);
+  background: var(--bazaar-panel);
+}
+
+.bazaar-stall__shelf {
+  margin: 0 0 12px;
+  color: var(--bazaar-muted);
+  font-size: 13px;
+}
+
+.bazaar-stall__grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.bazaar-stall-card {
+  background: var(--bazaar-card);
+  border: 1px solid var(--bazaar-line);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.bazaar-stall-card__cover {
+  display: block;
+  width: 100%;
+  height: 72px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  border: none;
+}
+
+.bazaar-stall-card__cover--btn {
+  cursor: pointer;
+}
+
+.bazaar-stall-card h2 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.bazaar-stall-card__meta {
+  margin: 4px 0 8px;
+  font-size: 12px;
+  color: var(--bazaar-neon);
+}
+
+.bazaar-stall-card__meta span {
+  color: var(--bazaar-gold);
+}
+
+.bazaar-stall-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bazaar-stall__empty {
+  width: 100%;
+  min-height: 150px;
+  border: 1px dashed #475569;
+  border-radius: 12px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.bazaar-stall__empty:hover {
+  color: var(--bazaar-ink);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.bazaar-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: rgba(4, 8, 20, 0.62);
+}
+
+.bazaar-modal__dialog {
+  width: min(560px, 100%);
+  max-height: min(88vh, 820px);
+  overflow: auto;
+  background: var(--bazaar-panel);
+  border: 1px solid var(--bazaar-line);
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.08), 0 24px 60px rgba(4, 8, 20, 0.45);
+}
+
+.bazaar-editor {
+  padding: 18px 18px 20px;
+}
+
+.bazaar-editor .bazaar-app__error {
+  margin: 0 0 12px;
+}
+
+.bazaar-editor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.bazaar-editor__header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.bazaar-editor__cover {
+  height: 64px;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.bazaar-editor__form {
+  display: grid;
+  gap: 12px;
+}
+
+.bazaar-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bazaar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bazaar-chips__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--bazaar-line);
+  background: #0c1220;
+  color: var(--bazaar-ink);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.bazaar-chips__chip:hover {
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.bazaar-chips__row {
+  display: flex;
+  gap: 8px;
+}
+
+.bazaar-chips__row input[type='text'] {
+  flex: 1;
+  border: 1px solid var(--bazaar-line);
+  background: #0c1220;
+  color: var(--bazaar-ink);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.bazaar-chips__row input[type='text']:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.6);
+}
+
+.bazaar-editor__preview {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  background: rgba(14, 165, 233, 0.08);
+}
+
+.bazaar-editor__preview h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--bazaar-neon);
+}
+
+.bazaar-editor__preview-title {
+  margin: 0 0 6px;
+  font-weight: 650;
+}
+
+.bazaar-editor__preview-pitch {
+  margin: 0 0 8px;
+  color: var(--bazaar-muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.bazaar-editor__preview-features {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  color: var(--bazaar-ink);
+  font-size: 13px;
+}
+
 .bazaar-onboarding {
   flex: 1;
   display: grid;

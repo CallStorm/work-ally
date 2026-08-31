@@ -62,6 +62,8 @@ export type BazaarLeaderboardRow = {
   userName: string;
 };
 
+export const BAZAAR_SHELF_LIMIT = 8;
+
 export const BAZAAR_STALL_SKINS: BazaarStallSkin[] = [
   'neon-blue',
   'violet-pulse',

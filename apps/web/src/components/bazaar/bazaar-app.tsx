@@ -3,18 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, apiFetch } from '@/lib/api';
 import { MarketHall } from './market-hall';
+import { MyStall } from './my-stall';
 import { OnboardingCompany } from './onboarding-company';
+import { UserStall } from './user-stall';
 import type { BazaarCompany, BazaarView } from './types';
 
 const STUB_COPY: Partial<Record<BazaarView, { title: string; body: string }>> = {
-  'stall-mine': {
-    title: '我的摊位',
-    body: '摊位货架与产品编辑将在下一步接入。',
-  },
-  'stall-user': {
-    title: '摊位',
-    body: '他人摊位只读页将在下一步接入。',
-  },
   product: {
     title: '产品详情',
     body: '产品介绍与打星将在下一步接入。',
@@ -158,15 +152,22 @@ export function BazaarApp() {
           onOpenStall={goStall}
         />
       )}
+      {!loading && !loadError && view === 'stall-mine' && company && (
+        <MyStall company={company} onCompanyChange={setCompany} />
+      )}
+      {!loading && !loadError && view === 'stall-user' && stallUserId && (
+        <UserStall
+          userId={stallUserId}
+          onOpenProduct={goProduct}
+          onBack={goMarket}
+        />
+      )}
       {!loading && !loadError && stub && (
         <div className="bazaar-stub">
           <h1>{stub.title}</h1>
           <p>{stub.body}</p>
           {view === 'product' && productId && (
             <p className="bazaar-stub__meta">产品 {productId}</p>
-          )}
-          {view === 'stall-user' && stallUserId && (
-            <p className="bazaar-stub__meta">摊主 {stallUserId}</p>
           )}
           <button type="button" className="bazaar-btn" onClick={goMarket}>
             返回展会大厅
