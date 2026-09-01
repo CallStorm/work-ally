@@ -4,11 +4,17 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CreateSessionSchema, type CreateSessionInput } from '@work-ally/shared';
+import {
+  ATTACHMENT_MAX_COUNT,
+  ATTACHMENT_MAX_TOTAL_BYTES,
+  CreateSessionSchema,
+  type CreateSessionInput,
+} from '@work-ally/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../../common/current-user.decorator';
 import { RuntimeService } from '../runtime/runtime.service';
 import { AclService } from '../acl/acl.service';
+import { AttachmentsService } from '../attachments/attachments.service';
 
 @Injectable()
 export class SessionsService {
@@ -16,6 +22,7 @@ export class SessionsService {
     private readonly prisma: PrismaService,
     private readonly runtime: RuntimeService,
     private readonly acl: AclService,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   async list(user: AuthUser, groupId?: string) {
@@ -138,10 +145,14 @@ export class SessionsService {
       });
     }
 
+    const attachmentIds = input.attachmentIds ?? [];
+    await this.validateAttachments(user, attachmentIds);
+    const content =
+      input.content.trim() ||
+      (attachmentIds.length ? '请结合附件回答' : input.content);
+
     const title =
-      input.content.length > 40
-        ? `${input.content.slice(0, 40)}…`
-        : input.content;
+      content.length > 40 ? `${content.slice(0, 40)}…` : content;
 
     const session = await this.prisma.session.create({
       data: {
@@ -156,8 +167,8 @@ export class SessionsService {
         messages: {
           create: {
             role: 'user',
-            content: input.content,
-            attachmentIds: input.attachmentIds,
+            content,
+            attachmentIds,
           },
         },
       },
@@ -191,12 +202,20 @@ export class SessionsService {
     body: { content: string; attachmentIds?: string[] },
   ) {
     const session = await this.get(user, sessionId);
+    const attachmentIds = body.attachmentIds ?? [];
+    await this.validateAttachments(user, attachmentIds);
+    const content =
+      body.content.trim() ||
+      (attachmentIds.length ? '请结合附件回答' : '');
+    if (!content) {
+      throw new BadRequestException('请输入内容或添加附件');
+    }
     const message = await this.prisma.message.create({
       data: {
         sessionId: session.id,
         role: 'user',
-        content: body.content,
-        attachmentIds: body.attachmentIds ?? [],
+        content,
+        attachmentIds,
       },
     });
     const run = await this.prisma.agentRun.create({
@@ -210,6 +229,18 @@ export class SessionsService {
     });
     const execution = this.runtime.executeRun(run.id);
     return { sessionId, runId: run.id, messageId: message.id, execution };
+  }
+
+  private async validateAttachments(user: AuthUser, ids: string[]) {
+    if (ids.length > ATTACHMENT_MAX_COUNT) {
+      throw new BadRequestException(`最多 ${ATTACHMENT_MAX_COUNT} 个附件`);
+    }
+    const rows = await this.attachments.assertOwned(ids, user);
+    const total = rows.reduce((s, r) => s + r.size, 0);
+    if (total > ATTACHMENT_MAX_TOTAL_BYTES) {
+      throw new BadRequestException('附件合计不能超过 50MB');
+    }
+    return rows;
   }
 
   private async assertGroupAccess(user: AuthUser, groupId: string) {
