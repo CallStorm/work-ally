@@ -77,7 +77,7 @@ export const CreateSessionSchema = z.object({
   modelConfigId: z.string().min(1),
   /** Denormalized / legacy; ignored when modelConfigId resolves */
   modelId: z.string().min(1).optional(),
-  content: z.string().min(1),
+  content: z.string().default(''),
   attachmentIds: z.array(z.string()).default([]),
   context: SessionContextSchema.default({
     skillIds: [],
@@ -86,6 +86,14 @@ export const CreateSessionSchema = z.object({
     knowledgeIds: [],
     attachmentIds: [],
   }),
+}).superRefine((val, ctx) => {
+  const text = val.content.trim();
+  if (!text && val.attachmentIds.length === 0) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: '请输入内容或添加附件', path: ['content'] });
+  }
+  if (val.attachmentIds.length > ATTACHMENT_MAX_COUNT) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: `最多 ${ATTACHMENT_MAX_COUNT} 个附件`, path: ['attachmentIds'] });
+  }
 });
 export type CreateSessionInput = z.infer<typeof CreateSessionSchema>;
 
@@ -210,3 +218,13 @@ export type UpdateAppRegistryInput = z.infer<typeof UpdateAppRegistrySchema>;
 
 export const APP_NAME = 'WorkAlly';
 export const API_PREFIX = '/api';
+
+export const ATTACHMENT_MAX_COUNT = 5;
+export const ATTACHMENT_MAX_FILE_BYTES = 20 * 1024 * 1024;
+export const ATTACHMENT_MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+
+export const AttachmentAllowedExtensions = [
+  '.md', '.txt', '.json', '.csv',
+  '.png', '.jpg', '.jpeg', '.webp', '.gif',
+  '.pdf', '.docx', '.xlsx',
+] as const;
