@@ -332,7 +332,12 @@ export class ModelsService implements OnModuleInit {
   async updateModel(
     tenantId: string,
     id: string,
-    body: Partial<{ displayName: string; enabled: boolean; sortOrder: number }>,
+    body: Partial<{
+      displayName: string;
+      enabled: boolean;
+      sortOrder: number;
+      supportsVision: boolean;
+    }>,
   ) {
     const existing = await this.prisma.modelConfig.findFirst({
       where: { id, tenantId },

@@ -134,7 +134,12 @@ export class ModelsController {
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body()
-    body: Partial<{ displayName: string; enabled: boolean; sortOrder: number }>,
+    body: Partial<{
+      displayName: string;
+      enabled: boolean;
+      sortOrder: number;
+      supportsVision: boolean;
+    }>,
   ) {
     return this.models.updateModel(user.tenantId, id, body);
   }

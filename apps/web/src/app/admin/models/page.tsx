@@ -32,6 +32,7 @@ type ModelRow = {
   modelId: string;
   displayName: string;
   enabled: boolean;
+  supportsVision: boolean;
   providerId: string | null;
   provider?: { id: string; name: string; preset: string } | null;
 };
@@ -172,6 +173,22 @@ export default function AdminModelsPage() {
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : '更新模型失败');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function toggleSupportsVision(row: ModelRow) {
+    setBusyId(row.id);
+    setError(null);
+    try {
+      await apiFetch(`/admin/models/${row.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ supportsVision: !row.supportsVision }),
+      });
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '更新视觉支持失败');
     } finally {
       setBusyId(null);
     }
@@ -484,6 +501,33 @@ export default function AdminModelsPage() {
                             >
                               API · {provider.preset}
                             </span>
+                            <label
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                fontSize: 12,
+                                color: '#64748b',
+                                cursor:
+                                  busyId === item.id || !provider.enabled
+                                    ? 'not-allowed'
+                                    : 'pointer',
+                                opacity:
+                                  busyId === item.id || !provider.enabled
+                                    ? 0.6
+                                    : 1,
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={item.supportsVision}
+                                disabled={
+                                  busyId === item.id || !provider.enabled
+                                }
+                                onChange={() => void toggleSupportsVision(item)}
+                              />
+                              支持视觉
+                            </label>
                             <Toggle
                               checked={item.enabled}
                               disabled={
