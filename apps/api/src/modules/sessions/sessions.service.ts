@@ -90,6 +90,10 @@ export class SessionsService {
     }
     return {
       ...session,
+      messages: session.messages.map((m) => ({
+        ...m,
+        attachmentIds: asAttachmentIds(m.attachmentIds),
+      })),
       runs: session.runs.map((run) => ({
         id: run.id,
         state: run.state,
@@ -256,4 +260,9 @@ export class SessionsService {
       throw new ForbiddenException('Not a member of this group');
     }
   }
+}
+
+function asAttachmentIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(String).filter(Boolean);
 }

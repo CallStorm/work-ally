@@ -3,11 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import ChatMarkdown from '@/components/chat-markdown';
+import {
+  AttachmentChips,
+  HistoryAttachmentChips,
+} from '@/components/attachment-chips';
 import RunTracePanel from '@/components/run-trace-panel';
 import SessionResourcePanel, {
   useResourcePanelState,
 } from '@/components/session-resource-panel';
 import { apiFetch } from '@/lib/api';
+import { ATTACHMENT_ACCEPT, useAttachmentUpload } from '@/lib/attachments';
 import { useAuth } from '@/lib/auth';
 import { subscribeRunEvents } from '@/lib/sse';
 import type {
@@ -85,6 +90,13 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const eventsRef = useRef<RuntimeEvent[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const upload = useAttachmentUpload();
+
+  const hasUploading = upload.items.some((item) => item.status === 'uploading');
+  const canSend =
+    (draft.trim().length > 0 || upload.attachmentIds.length > 0) &&
+    !hasUploading;
 
   const agentName = session?.expert?.name ?? 'WorkAlly';
 
@@ -253,21 +265,33 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
   }, [auth, initialRunId, refreshSession]);
 
   async function sendFollowUp() {
-    const content = draft.trim();
-    if (!content || busy) return;
+    const text = draft.trim();
+    const ids = upload.attachmentIds;
+    if ((!text && ids.length === 0) || busy || hasUploading) return;
+    const content = text || '请结合附件回答';
     setBusy(true);
     setError(null);
     setDraft('');
+    upload.clear();
     setMessages((prev) => [
       ...prev,
-      { id: `local-${Date.now()}`, role: 'user', content },
+      {
+        id: `local-${Date.now()}`,
+        role: 'user',
+        content,
+        attachmentIds: ids,
+      },
     ]);
     try {
       const created = await apiFetch<{ runId: string }>(
         `/sessions/${sessionId}/messages`,
         {
           method: 'POST',
-          body: JSON.stringify({ content, wait: false }),
+          body: JSON.stringify({
+            content,
+            attachmentIds: ids,
+            wait: false,
+          }),
         },
       );
       router.replace(
@@ -325,6 +349,9 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
               m.role === 'user' ? (
                 <div key={m.id} className="session-chat__user-bubble">
                   <div style={{ whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                  {m.attachmentIds && m.attachmentIds.length > 0 && (
+                    <HistoryAttachmentChips ids={m.attachmentIds} />
+                  )}
                 </div>
               ) : (
                 <AssistantTurn
@@ -354,7 +381,26 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
           {error && (
             <div className="session-chat__error">{error}</div>
           )}
+          {upload.error && (
+            <div className="session-chat__error">{upload.error}</div>
+          )}
           <div className="session-chat__composer">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={ATTACHMENT_ACCEPT}
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                if (e.target.files?.length) {
+                  upload.addFiles(e.target.files);
+                }
+                e.target.value = '';
+              }}
+            />
+            {upload.items.length > 0 && (
+              <AttachmentChips items={upload.items} onRemove={upload.remove} />
+            )}
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
@@ -369,13 +415,23 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
               }}
             />
             <div className="session-chat__composer-bar">
+              <button
+                type="button"
+                className="session-chat__attach"
+                title="添加文件"
+                disabled={busy}
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="添加文件"
+              >
+                +
+              </button>
               <span className="session-chat__composer-hint">
                 {session?.modelId ?? 'auto'}
               </span>
               <button
                 type="button"
                 className="session-chat__send"
-                disabled={busy || !draft.trim()}
+                disabled={busy || !canSend}
                 onClick={() => void sendFollowUp()}
                 aria-label="发送"
               >

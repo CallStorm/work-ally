@@ -1,7 +1,8 @@
 'use client';
 
-import type { CSSProperties } from 'react';
-import type { AttachmentUploadItem } from '@/lib/attachments';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { apiDownload, apiFetch } from '@/lib/api';
+import type { AttachmentMeta, AttachmentUploadItem } from '@/lib/attachments';
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -126,5 +127,117 @@ function AttachmentChip({
         ×
       </button>
     </span>
+  );
+}
+
+export function HistoryAttachmentChips({ ids }: { ids: string[] }) {
+  const [items, setItems] = useState<
+    Array<{ id: string; meta?: AttachmentMeta; error?: string }>
+  >([]);
+
+  useEffect(() => {
+    if (ids.length === 0) {
+      setItems([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const resolved = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const meta = await apiFetch<AttachmentMeta>(`/attachments/${id}`);
+            return { id, meta };
+          } catch (err) {
+            return {
+              id,
+              error: err instanceof Error ? err.message : '加载失败',
+            };
+          }
+        }),
+      );
+      if (!cancelled) setItems(resolved);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ids.join(',')]);
+
+  if (ids.length === 0) return null;
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginTop: 8,
+      }}
+    >
+      {items.map((item) => (
+        <HistoryAttachmentChip key={item.id} item={item} />
+      ))}
+    </div>
+  );
+}
+
+function HistoryAttachmentChip({
+  item,
+}: {
+  item: { id: string; meta?: AttachmentMeta; error?: string };
+}) {
+  const [downloading, setDownloading] = useState(false);
+  const label = item.meta?.filename ?? item.id.slice(0, 8);
+  const size = item.meta?.size;
+
+  async function download() {
+    if (!item.meta || downloading) return;
+    setDownloading(true);
+    try {
+      await apiDownload(
+        `/attachments/${item.id}/content`,
+        item.meta.filename,
+      );
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  const chipStyle: CSSProperties = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    background: item.error ? '#fef2f2' : 'rgba(255,255,255,0.85)',
+    border: item.error ? '1px solid #fecaca' : '1px solid rgba(0,0,0,0.08)',
+    borderRadius: 999,
+    padding: '4px 10px',
+    fontSize: 12,
+    color: item.error ? '#b42318' : '#334155',
+    maxWidth: 280,
+    cursor: item.meta && !downloading ? 'pointer' : 'default',
+  };
+
+  return (
+    <button
+      type="button"
+      style={chipStyle}
+      title={item.error ?? (item.meta ? '点击下载' : undefined)}
+      disabled={!item.meta || downloading}
+      onClick={() => void download()}
+    >
+      <span
+        style={{
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {downloading ? '下载中…' : label}
+      </span>
+      {size != null && !item.error && (
+        <span style={{ color: '#94a3b8', flexShrink: 0 }}>
+          {formatBytes(size)}
+        </span>
+      )}
+    </button>
   );
 }
