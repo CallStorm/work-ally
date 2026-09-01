@@ -1,6 +1,6 @@
 # 会话用户附件上传
 
-> 状态：**已批准，待写实现计划**  
+> 状态：**实现中（待手验）** — 代码已合入 `feat/session-attachments`；手验清单见 `.superpowers/sdd/session-attachments-smoke.md`。MiniMax vision E2E blocked（Task 0 spike）。  
 > 日期：2026-09-01  
 > 关联：`docs/requirements-baseline.md` §8.3 / 附件与 MinIO；`docs/superpowers/specs/2026-08-23-session-resource-panel-design.md`（附件 ≠ 产物）
 
