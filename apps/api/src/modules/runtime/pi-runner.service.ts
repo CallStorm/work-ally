@@ -35,6 +35,8 @@ export class PiRunnerService {
     bundle: AgentBundle;
     userMessage: string;
     history: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
+    images?: Array<{ mime: string; base64: string; filename: string }>;
+    supportsVision?: boolean;
   }): Promise<PiRunnerResult> {
     // Nest compiles to CJS; Pi is ESM-only — use native dynamic import.
     const importer = new Function(
@@ -75,6 +77,7 @@ export class PiRunnerService {
       baseUrl,
       modelId,
       providerId: piProviderId,
+      supportsVision: input.supportsVision,
     });
 
     const authStorage = pi.AuthStorage.create(path.join(agentDir, 'auth.json'));
@@ -205,7 +208,17 @@ export class PiRunnerService {
 
     try {
       const prompt = buildPrompt(input.history, input.userMessage);
-      await session.prompt(prompt);
+      const piImages = toPiImages(input.images, input.supportsVision);
+      if (piImages.length > 0) {
+        await session.prompt(prompt, { images: piImages });
+      } else {
+        if (input.images?.length && !input.supportsVision) {
+          this.logger.warn(
+            `Skipping ${input.images.length} image(s): model supportsVision is off`,
+          );
+        }
+        await session.prompt(prompt);
+      }
       if (!text.trim()) {
         // Fallback: last assistant message from session if deltas missed
         const messages = session.messages ?? [];
@@ -366,6 +379,24 @@ function buildPrompt(
     .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
     .join('\n');
   return prior ? `${prior}\nUSER: ${userMessage}` : userMessage;
+}
+
+type PiImageContent = {
+  type: 'image';
+  data: string;
+  mimeType: string;
+};
+
+function toPiImages(
+  images: Array<{ mime: string; base64: string; filename: string }> | undefined,
+  supportsVision: boolean | undefined,
+): PiImageContent[] {
+  if (!supportsVision || !images?.length) return [];
+  return images.map((img) => ({
+    type: 'image' as const,
+    data: img.base64,
+    mimeType: img.mime || 'application/octet-stream',
+  }));
 }
 
 function extractText(content: unknown): string {

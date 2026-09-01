@@ -41,6 +41,7 @@ export class RuntimePathsService {
     modelId: string;
     providerId?: string;
     apiKeyPlaceholder?: string;
+    supportsVision?: boolean;
   }) {
     const providerId = input.providerId || 'minimax';
     const doc = {
@@ -54,7 +55,7 @@ export class RuntimePathsService {
               id: input.modelId,
               name: input.modelId,
               reasoning: false,
-              input: ['text'],
+              input: input.supportsVision ? ['text', 'image'] : ['text'],
               contextWindow: 200000,
               maxTokens: 8192,
               cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

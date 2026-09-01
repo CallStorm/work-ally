@@ -258,6 +258,7 @@ function shouldSkipPath(normalized: string): boolean {
   const parts = normalized.split(/[/\\]/);
   if (parts.some((p) => p.startsWith('.'))) return true;
   if (parts.includes('node_modules')) return true;
+  if (parts[0] === 'uploads' || parts.includes('uploads')) return true;
   return false;
 }
 

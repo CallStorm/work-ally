@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import type { MembershipRole } from '@work-ally/shared';
+import type { AuthUser } from '../../common/current-user.decorator';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AttachmentAssemblyService } from '../attachments/attachment-assembly.service';
 import { RuntimeEventsService } from './runtime-events.service';
 import { MastraRunnerService } from './mastra-runner.service';
 import { PiRunnerService } from './pi-runner.service';
@@ -23,6 +26,7 @@ export class RuntimeService implements OnModuleInit {
     private readonly runner: MastraRunnerService,
     private readonly piRunner: PiRunnerService,
     private readonly capabilities: CapabilityBundleService,
+    private readonly assembly: AttachmentAssemblyService,
     private readonly config: ConfigService,
     private readonly moduleRef: ModuleRef,
   ) {}
@@ -85,6 +89,19 @@ export class RuntimeService implements OnModuleInit {
           content: m.content,
         }));
 
+      const runUser = await this.resolveRunUser(
+        run.session.tenantId,
+        run.session.createdBy,
+      );
+      const assembled = await this.assembly.assemble({
+        user: runUser,
+        sessionId: run.sessionId,
+        tenantId: run.session.tenantId,
+        attachmentIds: asAttachmentIds(run.message.attachmentIds),
+        userText: run.message.content,
+        modelConfigId: run.session.modelConfigId,
+      });
+
       const engine = this.resolveEngine();
       let result: {
         text: string;
@@ -99,8 +116,10 @@ export class RuntimeService implements OnModuleInit {
             sessionId: run.sessionId,
             tenantId: run.session.tenantId,
             bundle,
-            userMessage: run.message.content,
+            userMessage: assembled.text,
             history,
+            images: assembled.images,
+            supportsVision: assembled.supportsVision,
           });
         } catch (error) {
           const message =
@@ -113,7 +132,7 @@ export class RuntimeService implements OnModuleInit {
             runId,
             sessionId: run.sessionId,
             bundle,
-            userMessage: run.message.content,
+            userMessage: assembled.text,
             history,
           });
         }
@@ -122,7 +141,7 @@ export class RuntimeService implements OnModuleInit {
           runId,
           sessionId: run.sessionId,
           bundle,
-          userMessage: run.message.content,
+          userMessage: assembled.text,
           history,
         });
       }
@@ -180,6 +199,32 @@ export class RuntimeService implements OnModuleInit {
     }
   }
 
+  private async resolveRunUser(
+    tenantId: string,
+    userId: string,
+  ): Promise<AuthUser> {
+    const membership = await this.prisma.membership.findFirst({
+      where: { tenantId, userId, status: 'active' },
+      include: { user: true },
+    });
+    if (!membership) {
+      return {
+        userId,
+        tenantId,
+        role: 'member',
+        phone: '',
+        name: '',
+      };
+    }
+    return {
+      userId,
+      tenantId,
+      role: membership.role as MembershipRole,
+      phone: membership.user.phone,
+      name: membership.user.name,
+    };
+  }
+
   private async promoteWorkspaceArtifacts(
     runId: string,
     sessionId: string,
@@ -212,4 +257,9 @@ export class RuntimeService implements OnModuleInit {
     if (!run) throw new NotFoundException('Run not found');
     return run;
   }
+}
+
+function asAttachmentIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(String).filter(Boolean);
 }
