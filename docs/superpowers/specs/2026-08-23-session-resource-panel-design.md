@@ -1,6 +1,6 @@
 # 会话资源侧栏（工作空间文件 + 会话产物）
 
-> 状态：**待实现**  
+> 状态：**已实现**（2026-08-31 手验通过；UI 以交付物优先列表落地，见下方「落地差异」）  
 > 日期：2026-08-23  
 > 关联：`docs/requirements-baseline.md` §5.4、§5.8；`docs/superpowers/specs/2026-08-22-pi-runtime-design.md`
 
@@ -8,19 +8,30 @@
 
 在对话页右侧增加可折叠资源侧栏，让用户可以：
 
-1. 浏览当前会话的 **工作空间文件**（Agent 沙箱实时文件树）
-2. 查看 **会话产物**（Agent 写入文件的自动晋升列表，可预览/下载）
+1. 浏览当前会话的 **工作空间文件**（Agent 沙箱实时文件）
+2. 查看 **会话产物**（自动晋升索引；侧栏以交付物优先展示，可预览/下载）
 
-对齐 CodeBuddy 式交互：顶栏侧栏切换按钮 → 下拉切换视图 → 文件树/产物列表 → 点击预览。
+对齐 CodeBuddy 式交互：顶栏侧栏切换 → 文件列表 → 点击预览/下载。
+
+## 落地差异（相对初稿）
+
+| 初稿 | 现状 |
+|---|---|
+| 下拉切换「工作空间文件 / 会话产物」两视图 | **统一「会话文件」列表**：交付物（pptx/docx/xlsx/pdf/html/md/图片等）置顶，「其他文件」其次；`session_artifacts` 仍作索引 |
+| 目录树 + 文件夹展开 | **扁平文件列表**（递归扫描后展平） |
+| bash 创建仅 P2 扫描 | **已落地**：`run_finished` 前 `scanWorkspaceAndPromote`；`GET /artifacts` 也会 reconcile |
+| SSE 断线无恢复说明 | SSE 对 502/503 重试；断线后 `refreshSession` + 调 artifacts 对齐；离开页可恢复近 2h 内 running/queued run |
+
+手验（2026-08-31）：会话 `cmth1iggn000gquj0p97d3c62` — tree/artifacts 含 `xian_trip_plan.pptx`；workspace/artifact 下载 37441 bytes；删 artifact 行后 GET 可重建；植入 `smoke-new.pptx` 可晋升；UI 侧栏可见 pptx 与「下载」。
 
 ## 已拍板决策
 
 | 议题 | 结论 |
 |---|---|
-| 产物晋升策略 | **方案 1**：Agent 通过 `write` / `edit` 写入/修改的文件 **全部自动成为会话产物**，无需用户手动标记 |
+| 产物晋升策略 | **方案 1 扩展**：`write` / `edit` 即时晋升；run 结束 / 列表查询时扫描工作区补齐 bash 等间接创建文件 |
 | 沙箱作用域 | **会话级** cwd：`.data/sessions/{tenantId}/{sessionId}/`（多轮对话共享工作空间） |
 | 产物中心 | **不做**独立产物库页面；仅在对话侧栏内展示（符合 §5.8 非目标） |
-| 右栏演进 | 一期先上「工作空间文件 + 会话产物」；后续与 KnowledgeHit / ToolCall 合并为 Tab（§5.4） |
+| 右栏演进 | 一期为「会话文件」交付物优先列表；后续与 KnowledgeHit / ToolCall 合并为 Tab（§5.4） |
 | 用户附件 | 本期不实现上传；`Attachment` 模型保持独立，不与产物混用 |
 
 ## 概念定义
@@ -28,21 +39,22 @@
 | 概念 | 含义 | 存储 |
 |---|---|---|
 | **工作空间文件** | 当前会话 Agent 可读写的沙箱目录内全部文件 | 文件系统（不入库） |
-| **会话产物** | Agent `write` / `edit` 触及的文件，自动索引 | `session_artifacts` 表 + 文件系统 |
+| **会话产物** | 工作区非隐藏文件的自动索引（含 write/edit 与 bash 扫描） | `session_artifacts` 表 + 文件系统 |
 | **用户附件** | 用户通过 `+` 上传的输入文件（后续） | `attachments` 表 |
 
 ```text
-用户消息 → AgentRun → write/edit → 工作空间文件
-                                      ↓（自动晋升）
+用户消息 → AgentRun → write/edit/bash → 工作空间文件
+                                      ↓（即时 + run 结束扫描 + GET reconcile）
                                    会话产物（索引 + SSE 通知）
+                                      ↓
+                                   侧栏「会话文件」（交付物优先）
 ```
 
 **工作空间文件 vs 会话产物：**
 
-- 工作空间文件 = 完整实时目录树（含 Agent 中间文件、脚本、缓存目录等）
-- 会话产物 = Agent 写入/修改过的文件的 **扁平索引视图**（按时间倒序，带来源 run）
-
-两者内容有重叠，但视图目的不同：工作空间用于「看 Agent 在干什么」，产物用于「拿交付物」。
+- 工作空间文件 = 沙箱内实时文件（含中间脚本、JSON、缓存等）
+- 会话产物 = 可下载交付物的 **索引**（同 path upsert，带来源 run）
+- 侧栏当前把两者合成一个列表，用扩展名区分「交付物 / 其他文件」
 
 ## UI 设计
 
@@ -55,42 +67,38 @@
 └─────────────┴──────────────────────────┴──────────────────┘
 ```
 
-- **入口**：`session-chat.tsx` 顶栏右侧，侧栏切换图标（参考 CodeBuddy）
-- **默认宽度**：280px，可拖拽至 400px
-- **持久化**：`localStorage` 记忆开/关状态与上次选中视图
-- **响应式**：宽度 < 900px 时侧栏以 overlay 形式覆盖，而非挤压对话区
+- **入口**：`session-chat.tsx` 顶栏右侧，侧栏切换图标
+- **默认宽度**：约 300px；可放大至约 50vw（上限 520px）
+- **持久化**：`localStorage` 记忆开/关（`workally.resourcePanel.open`）
+- **响应式**：与对话区并排；窄屏下仍为右侧栏（未做 overlay）
 
-### 面板结构
+### 面板结构（落地）
 
 ```text
 ┌─────────────────────────────────────┐
-│ ☰          ↗ 全屏        ⊟ 关闭     │
+│ 会话文件 (N)          ↗放大  ⊟关闭  │
+│ 交付物优先 · 可预览或下载             │
 ├─────────────────────────────────────┤
-│ [ 工作空间文件 ▾ ]                   │
-├─────────────────────────────────────┤
-│ 📁 output/                          │
-│   📄 识字启蒙工作台.html    ● 新     │
-│ 📄 报告.md                          │
+│ 交付物                               │
+│   P  xian_trip_plan.pptx  · 36.6 KB │
+│ 其他文件                             │
+│   { } fix_keys.py         · 968 B   │
+│   {}  plan.json           · …       │
 │                                     │
-│  (空态: "Agent 执行后将在此显示文件")  │
+│  (空态: "Agent 生成文件后将显示在这里") │
+├─────────────────────────────────────┤
+│ 预览区：文件名 · 大小 · [下载]        │
 └─────────────────────────────────────┘
 ```
 
-**视图下拉选项：**
-
-| 视图 | 展示形式 | 排序 |
-|---|---|---|
-| 工作空间文件 | 目录树（可展开/折叠） | 文件夹优先，字母序 |
-| 会话产物 | 扁平列表（含相对路径） | `createdAt` 倒序 |
-
 ### 交互
 
-| 操作 | 工作空间文件 | 会话产物 |
-|---|---|---|
-| 单击 | 侧栏下半部预览 / overlay 预览 | 同左 |
-| 下载 | 右键或 `⋯` 菜单 | 同左 |
-| Agent 写入时 | 树节点高亮 + 「新」角标 | 列表顶部插入 + 侧栏按钮角标 |
-| 空态 | 提示文案 + 灰色占位图标 | 「暂无产物，Agent 生成文件后将自动出现」 |
+| 操作 | 行为 |
+|---|---|
+| 单击文件行 | 底部预览区加载内容；二进制（如 pptx）显示元信息 + 下载 |
+| 下载 | 预览区「下载」/「下载文件」→ `GET .../workspace/download` |
+| Agent 写入 / run 结束 | SSE `artifact_*` / `workspace_file_changed` / `run_finished` 触发刷新 |
+| 空态 | 「Agent 生成文件后将显示在这里」 |
 
 ### 预览能力（一期）
 
@@ -168,7 +176,7 @@ After:  .data/sessions/{tenantId}/{sessionId}/
 - `node_modules/` 目录下文件
 - 零字节文件
 
-**bash 间接创建的文件：** 一期不自动扫描；仅 `write` / `edit` 显式触及的路径晋升。后续可加 run 结束时的目录 diff 扫描（P2）。
+**bash 间接创建的文件：** run 成功结束前 `scanWorkspaceAndPromote`；`GET /sessions/:id/artifacts` 也会全量 reconcile（补漏、支持刷新后恢复）。
 
 ## API 设计
 
@@ -302,13 +310,13 @@ type SessionArtifact = {
 
 ## 分期交付
 
-| 阶段 | 范围 | 优先级 |
-|---|---|---|
-| **P0** | 会话级 cwd 改造 + workspace tree API + 侧栏 UI 骨架 + 文件树 + 下载 | Must |
-| **P1** | 产物自动晋升 + artifacts API + 产物列表 + md/html/代码预览 | Must |
-| **P2** | SSE 实时刷新 + 侧栏角标 + run 结束目录 diff（补 bash 创建） | Should |
-| **P3** | 与 KnowledgeHit / ToolCall 合并为统一右栏 Tab | Should |
-| **Later** | xlsx 预览、产物跨会话引用、TTL 清理策略 | Later |
+| 阶段 | 范围 | 优先级 | 状态 |
+|---|---|---|---|
+| **P0** | 会话级 cwd + workspace tree/download API + 侧栏 + 下载 | Must | **已落地**（扁平列表） |
+| **P1** | 产物自动晋升 + artifacts API + md/html/代码/图片预览 | Must | **已落地** |
+| **P2** | SSE 刷新 + run 结束扫描（bash）+ 断线 refresh/reconcile | Should | **已落地** |
+| **P3** | 与 KnowledgeHit / ToolCall 合并为统一右栏 Tab | Should | 待做 |
+| **Later** | xlsx 预览、产物跨会话引用、TTL 清理策略 | Later | 待做 |
 
 ## 非目标（本期）
 
@@ -331,15 +339,16 @@ type SessionArtifact = {
 | 风险 | 缓解 |
 |---|---|
 | 会话级 cwd 改造影响现有 per-run 沙箱数据 | 迁移脚本：首次访问时从最近 run 目录 copy（若 session workspace 为空） |
-| bash 创建的文件不出现在产物列表 | P2 加 run 结束扫描；一期文档说明限制 |
+| bash 创建的文件不出现在产物列表 | 已用 run 结束扫描 + GET artifacts reconcile 缓解 |
 | 大文件预览阻塞 UI | 预览限制 2MB；超出仅提供下载 |
 | 磁盘无限增长 | Later：30 天 TTL + 管理员清理策略 |
 
 ## 验收标准
 
-1. 对话页顶栏右侧可打开/关闭资源侧栏
-2. 侧栏下拉可切换「工作空间文件」与「会话产物」
-3. Agent `write` 文件后，产物列表自动出现该文件（无需用户操作）
-4. 点击文件可预览 md/html/代码/图片，其他类型可下载
-5. 多轮对话中，工作空间文件在轮次间保持可用
-6. 无 session 权限的用户无法访问 workspace / artifacts API
+1. 对话页顶栏右侧可打开/关闭资源侧栏 — **通过**
+2. 侧栏以交付物优先列出会话文件（不再要求双视图下拉）— **通过**
+3. Agent `write` / bash 生成文件后，列表与 artifacts 索引出现该文件 — **通过**（含 pptx）
+4. 点击文件可预览 md/html/代码/图片；pptx 等二进制可下载 — **通过**
+5. 多轮对话中，工作空间文件在轮次间保持可用 — **通过**
+6. 无 session 权限的用户无法访问 workspace / artifacts API — （鉴权守卫保留；本次未做负例手验）
+7. SSE 断线或 API 重启后 refresh/reconcile 可恢复文件列表 — **通过**（代码路径 + artifacts reconcile 手验）
