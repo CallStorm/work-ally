@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.40",
+    "@aws-sdk/client-s3": "^3.1123.0",
     "@mariozechner/pi-coding-agent": "^0.73.1",
     "@mastra/core": "^1.61.0",
     "@modelcontextprotocol/sdk": "^1.30.0",

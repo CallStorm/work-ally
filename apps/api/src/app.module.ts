@@ -16,6 +16,7 @@ import { ModelsModule } from './modules/models/models.module';
 import { DefaultAgentModule } from './modules/default-agent/default-agent.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { AttachmentsModule } from './modules/attachments/attachments.module';
+import { StorageModule } from './modules/storage/storage.module';
 import { RuntimeModule } from './modules/runtime/runtime.module';
 import { WorkspaceModule } from './modules/workspace/workspace.module';
 import { AppsModule } from './modules/apps/apps.module';
@@ -41,6 +42,7 @@ import { AppsModule } from './modules/apps/apps.module';
     DefaultAgentModule,
     SessionsModule,
     AttachmentsModule,
+    StorageModule,
     RuntimeModule,
     WorkspaceModule,
     AppsModule,
