@@ -352,6 +352,7 @@ model ModelConfig {
   isAutoCandidate  Boolean  @default(false) @map("is_auto_candidate")
   enabled          Boolean  @default(true)
   sortOrder        Int      @default(0) @map("sort_order")
+  supportsVision   Boolean  @default(false) @map("supports_vision")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
@@ -413,8 +414,9 @@ model Attachment {
   filename   String
   mime       String
   size       Int
-  storageKey String   @map("storage_key")
-  createdAt  DateTime @default(now()) @map("created_at")
+  storageKey    String   @map("storage_key")
+  extractedText String?  @map("extracted_text") @db.LongText
+  createdAt     DateTime @default(now()) @map("created_at")
 
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   uploader User   @relation(fields: [uploaderId], references: [id])
