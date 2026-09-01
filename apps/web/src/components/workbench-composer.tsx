@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import ComposerAddons from '@/components/composer-addons';
 import ModelSelect from '@/components/model-select';
 import { apiFetch } from '@/lib/api';
+import { useAttachmentUpload } from '@/lib/attachments';
 import { useAuth } from '@/lib/auth';
 import { useCurrentGroup } from '@/lib/group-context';
 
@@ -64,6 +65,12 @@ export default function WorkbenchComposer() {
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [loadingAssets, setLoadingAssets] = useState(true);
+  const upload = useAttachmentUpload();
+
+  const hasUploading = upload.items.some((item) => item.status === 'uploading');
+  const canSend =
+    (content.trim().length > 0 || upload.attachmentIds.length > 0) &&
+    !hasUploading;
 
   const selectedExpert = useMemo(
     () => experts.find((e) => e.id === selectedExpertId) ?? null,
@@ -148,7 +155,7 @@ export default function WorkbenchComposer() {
       return;
     }
     const text = content.trim();
-    if (!text) return;
+    if (!text && upload.attachmentIds.length === 0) return;
     if (!modelConfigId) {
       setError('请先在管理后台配置并启用模型');
       return;
@@ -165,14 +172,14 @@ export default function WorkbenchComposer() {
           groupId: currentGroupId,
           expertId: selectedExpertId,
           modelConfigId,
-          content: text,
+          content: text || '请结合附件回答',
+          attachmentIds: upload.attachmentIds,
           wait: false,
           context: {
             skillIds,
             connectorIds,
             knowledgeEnabled: false,
             knowledgeIds: [],
-            attachmentIds: [],
           },
         }),
       });
@@ -239,6 +246,9 @@ export default function WorkbenchComposer() {
             onSkillIdsChange={setSkillIds}
             onConnectorIdsChange={setConnectorIds}
             loading={loadingAssets}
+            attachmentItems={upload.items}
+            onAttachmentAdd={upload.addFiles}
+            onAttachmentRemove={upload.remove}
             footer={
               <>
                 <ModelSelect
@@ -251,7 +261,7 @@ export default function WorkbenchComposer() {
                   type="button"
                   className="workbench-composer__send"
                   onClick={() => void send()}
-                  disabled={sending || !content.trim()}
+                  disabled={sending || !canSend}
                   aria-label="发送"
                 >
                   ↑
@@ -291,6 +301,9 @@ export default function WorkbenchComposer() {
 
         {error && (
           <p style={{ color: '#b42318', marginTop: 12 }}>{error}</p>
+        )}
+        {upload.error && (
+          <p style={{ color: '#b42318', marginTop: 12 }}>{upload.error}</p>
         )}
       </div>
     </main>

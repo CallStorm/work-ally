@@ -10,7 +10,9 @@ import {
   type ReactNode,
 } from 'react';
 import { ExpertAvatar } from '@/app/admin/experts/expert-form-dialog';
+import { AttachmentChips } from '@/components/attachment-chips';
 import ConnectorIcon from '@/components/connector-icon';
+import { ATTACHMENT_ACCEPT, type AttachmentUploadItem } from '@/lib/attachments';
 
 type ExpertItem = {
   id: string;
@@ -199,6 +201,9 @@ export default function ComposerAddons({
   onSkillIdsChange,
   onConnectorIdsChange,
   loading,
+  attachmentItems,
+  onAttachmentAdd,
+  onAttachmentRemove,
   children,
   footer,
 }: {
@@ -212,6 +217,9 @@ export default function ComposerAddons({
   onSkillIdsChange: (ids: string[]) => void;
   onConnectorIdsChange: (ids: string[]) => void;
   loading?: boolean;
+  attachmentItems?: AttachmentUploadItem[];
+  onAttachmentAdd?: (files: FileList | File[]) => void;
+  onAttachmentRemove?: (key: string) => void;
   children?: ReactNode;
   footer?: ReactNode;
 }) {
@@ -219,6 +227,7 @@ export default function ComposerAddons({
   const [activeMenu, setActiveMenu] = useState<MenuKey | null>(null);
   const [search, setSearch] = useState('');
   const rootRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedExpert = useMemo(
     () => experts.find((e) => e.id === expertId) ?? null,
@@ -338,8 +347,30 @@ export default function ComposerAddons({
     maxWidth: 220,
   };
 
+  function pickFiles() {
+    fileInputRef.current?.click();
+    setMenuOpen(false);
+    setActiveMenu(null);
+  }
+
   return (
     <div ref={rootRef} style={{ width: '100%', minWidth: 0 }}>
+      {onAttachmentAdd && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={ATTACHMENT_ACCEPT}
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            if (e.target.files?.length) {
+              onAttachmentAdd(e.target.files);
+            }
+            e.target.value = '';
+          }}
+        />
+      )}
+
       {selectedSkills.length > 0 && (
         <div
           style={{
@@ -380,6 +411,10 @@ export default function ComposerAddons({
             </span>
           ))}
         </div>
+      )}
+
+      {attachmentItems && attachmentItems.length > 0 && onAttachmentRemove && (
+        <AttachmentChips items={attachmentItems} onRemove={onAttachmentRemove} />
       )}
 
       {children}
@@ -462,7 +497,10 @@ export default function ComposerAddons({
                       key={item.key}
                       type="button"
                       onClick={() => {
-                        if (item.key === 'file') return;
+                        if (item.key === 'file') {
+                          if (onAttachmentAdd) pickFiles();
+                          return;
+                        }
                         openMenu(item.key);
                       }}
                       style={{
@@ -475,9 +513,15 @@ export default function ComposerAddons({
                         borderRadius: 10,
                         background:
                           activeMenu === item.key ? '#f1f5f9' : 'transparent',
-                        cursor: item.key === 'file' ? 'default' : 'pointer',
+                        cursor:
+                          item.key === 'file' && !onAttachmentAdd
+                            ? 'default'
+                            : 'pointer',
                         fontSize: 14,
-                        color: item.key === 'file' ? '#94a3b8' : '#0f172a',
+                        color:
+                          item.key === 'file' && !onAttachmentAdd
+                            ? '#94a3b8'
+                            : '#0f172a',
                         textAlign: 'left',
                       }}
                     >
@@ -488,11 +532,6 @@ export default function ComposerAddons({
                       {item.key !== 'file' && (
                         <span style={{ color: '#94a3b8' }}>
                           <ChevronRight />
-                        </span>
-                      )}
-                      {item.key === 'file' && (
-                        <span style={{ fontSize: 11, color: '#94a3b8' }}>
-                          即将推出
                         </span>
                       )}
                     </button>
