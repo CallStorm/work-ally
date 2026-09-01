@@ -203,13 +203,13 @@ export class SessionsService {
   async addMessage(
     user: AuthUser,
     sessionId: string,
-    body: { content: string; attachmentIds?: string[] },
+    body: { content?: string; attachmentIds?: string[] },
   ) {
     const session = await this.get(user, sessionId);
     const attachmentIds = body.attachmentIds ?? [];
     await this.validateAttachments(user, attachmentIds);
     const content =
-      body.content.trim() ||
+      (body.content ?? '').trim() ||
       (attachmentIds.length ? '请结合附件回答' : '');
     if (!content) {
       throw new BadRequestException('请输入内容或添加附件');

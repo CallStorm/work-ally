@@ -51,7 +51,7 @@ export class SessionsController {
   async addMessage(
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
-    @Body() body: { content: string; attachmentIds?: string[]; wait?: boolean },
+    @Body() body: { content?: string; attachmentIds?: string[]; wait?: boolean },
   ) {
     const created = await this.sessions.addMessage(user, id, body);
     if (body.wait) {

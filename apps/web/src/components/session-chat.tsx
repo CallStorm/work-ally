@@ -269,10 +269,11 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
     const ids = upload.attachmentIds;
     if ((!text && ids.length === 0) || busy || hasUploading) return;
     const content = text || '请结合附件回答';
+    const savedDraft = draft;
+    const savedUploadItems = upload.items;
     setBusy(true);
     setError(null);
     setDraft('');
-    upload.clear();
     setMessages((prev) => [
       ...prev,
       {
@@ -294,10 +295,14 @@ export default function SessionChat({ sessionId }: { sessionId: string }) {
           }),
         },
       );
+      upload.clear();
       router.replace(
         `/workbench/sessions/${sessionId}?runId=${created.runId}`,
       );
     } catch (err) {
+      setDraft(savedDraft);
+      upload.restore(savedUploadItems);
+      setMessages((prev) => prev.slice(0, -1));
       setError(err instanceof Error ? err.message : '发送失败');
       setBusy(false);
     }

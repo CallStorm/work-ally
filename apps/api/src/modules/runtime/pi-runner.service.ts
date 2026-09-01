@@ -210,7 +210,16 @@ export class PiRunnerService {
       const prompt = buildPrompt(input.history, input.userMessage);
       const piImages = toPiImages(input.images, input.supportsVision);
       if (piImages.length > 0) {
+        text = '';
         await session.prompt(prompt, { images: piImages });
+        const visionAssistant = getLastAssistantMessage(session);
+        if (isPromptFailure(visionAssistant) || !text.trim()) {
+          this.logger.warn(
+            `Vision prompt failed (${visionAssistant?.stopReason ?? 'empty'}), retrying text-only`,
+          );
+          text = '';
+          await session.prompt(prompt);
+        }
       } else {
         if (input.images?.length && !input.supportsVision) {
           this.logger.warn(
@@ -221,16 +230,25 @@ export class PiRunnerService {
       }
       if (!text.trim()) {
         // Fallback: last assistant message from session if deltas missed
-        const messages = session.messages ?? [];
-        for (let i = messages.length - 1; i >= 0; i -= 1) {
-          const m = messages[i] as { role?: string; content?: unknown };
-          if (m.role === 'assistant') {
-            text = extractText(m.content) || text;
-            break;
-          }
+        const assistant = getLastAssistantMessage(session);
+        if (assistant) {
+          text = extractText(assistant.content) || text;
         }
       }
-      return { text: text || '（Pi 未返回文本）', stepsCount: Math.max(stepsCount, 1), provider: 'pi' };
+      const finalAssistant = getLastAssistantMessage(session);
+      if (isPromptFailure(finalAssistant) || !text.trim()) {
+        const detail =
+          finalAssistant?.errorMessage?.trim() ||
+          (finalAssistant?.stopReason === 'error' ? 'Pi vision/provider error' : '');
+        throw new Error(
+          detail || 'Pi returned no text after prompt',
+        );
+      }
+      return {
+        text,
+        stepsCount: Math.max(stepsCount, 1),
+        provider: 'pi',
+      };
     } finally {
       unsubscribe();
       try {
@@ -397,6 +415,32 @@ function toPiImages(
     data: img.base64,
     mimeType: img.mime || 'application/octet-stream',
   }));
+}
+
+type PiAssistantMessage = {
+  role?: string;
+  content?: unknown;
+  stopReason?: string;
+  errorMessage?: string;
+};
+
+function getLastAssistantMessage(
+  session: { messages?: unknown[] },
+): PiAssistantMessage | undefined {
+  const messages = session.messages ?? [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i] as PiAssistantMessage;
+    if (m.role === 'assistant') return m;
+  }
+  return undefined;
+}
+
+function isPromptFailure(msg: PiAssistantMessage | undefined): boolean {
+  if (!msg) return true;
+  if (msg.stopReason === 'error') return true;
+  const err = String(msg.errorMessage ?? '');
+  if (/\b400\b/.test(err) || /bad request/i.test(err)) return true;
+  return false;
 }
 
 function extractText(content: unknown): string {

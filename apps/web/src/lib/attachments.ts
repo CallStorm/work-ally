@@ -163,6 +163,11 @@ export function useAttachmentUpload(maxCount = ATTACHMENT_MAX_COUNT) {
     setError(null);
   }, []);
 
+  const restore = useCallback((snapshot: AttachmentUploadItem[]) => {
+    setItems(snapshot);
+    setError(null);
+  }, []);
+
   const totalBytes = useMemo(
     () => items.reduce((sum, item) => sum + item.size, 0),
     [items],
@@ -176,5 +181,14 @@ export function useAttachmentUpload(maxCount = ATTACHMENT_MAX_COUNT) {
     [items],
   );
 
-  return { items, addFiles, remove, clear, attachmentIds, totalBytes, error };
+  return {
+    items,
+    addFiles,
+    remove,
+    clear,
+    restore,
+    attachmentIds,
+    totalBytes,
+    error,
+  };
 }
