@@ -585,8 +585,8 @@ git commit -m "docs: session attachments smoke checklist"
 
 ## Spike 结论（Task 0 完成后填写）
 
-- [ ] Pi multimodal API: _____________
-- [ ] Task 7 vision 验收: pass / blocked
+- [x] Pi multimodal API: **supported (partial)** — `session.prompt(text, { images: ImageContent[] })` and `sendUserMessage(string | (TextContent|ImageContent)[])`; `ImageContent = { type, data: base64, mimeType }`. Not `prompt(UserContent[])` — text + optional `images` option. Requires `model.input` includes `"image"` in `models.json` or Pi strips images to placeholder.
+- [x] Task 7 vision 验收: **blocked** on current MiniMax (`MiniMax-M3` @ `api.minimaxi.com/anthropic`) — image blocks return HTTP 400; text-only works. Task 7 should implement Pi image path + `writeModelsJson` `input: ['text','image']` when `supportsVision`, but fall back to uploads path hint for MiniMax until provider supports vision. Smoke「模型能描述 png」标 blocked + follow-up issue.
 
 ## Plan self-review
 
