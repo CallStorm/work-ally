@@ -100,6 +100,8 @@ export default function AdminImageStudioPage() {
   const router = useRouter();
   const [app, setApp] = useState<AppConfig | null>(null);
   const [models, setModels] = useState<ImageModel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -115,19 +117,31 @@ export default function AdminImageStudioPage() {
   }, [ready, auth, router]);
 
   async function refresh() {
-    const [cfg, modelList] = await Promise.all([
-      apiFetch<AppConfig>('/admin/apps/image-studio'),
-      apiFetch<ImageModel[]>('/admin/apps/image-studio/models'),
-    ]);
-    setApp(cfg);
-    setModels(modelList);
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [cfg, modelList] = await Promise.all([
+        apiFetch<AppConfig>('/admin/apps/image-studio'),
+        apiFetch<ImageModel[]>('/admin/apps/image-studio/models'),
+      ]);
+      setApp(cfg);
+      setModels(modelList);
+    } catch (err) {
+      setLoadError(
+        err instanceof Error ? err.message : '加载应用配置失败',
+      );
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
     void refresh().catch(() => {
-      setApp(null);
-      setModels([]);
+      /* loadError set in refresh */
     });
+    // Initial load only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function saveApp(patch: Partial<AppConfig>) {
@@ -199,6 +213,8 @@ export default function AdminImageStudioPage() {
         });
         setMessage('模型已创建');
       } else if (editingId) {
+        const editingRow = models.find((m) => m.id === editingId);
+        const keepDefault = Boolean(editingRow?.isDefault);
         const body: Record<string, unknown> = {
           name: form.name,
           provider: form.provider,
@@ -206,7 +222,7 @@ export default function AdminImageStudioPage() {
           modelName: form.modelName,
           capabilities,
           enabled: form.enabled,
-          isDefault: form.isDefault,
+          isDefault: keepDefault ? true : form.isDefault,
         };
         if (form.apiKey.trim()) body.apiKey = form.apiKey.trim();
         await apiFetch(`/admin/apps/image-studio/models/${editingId}`, {
@@ -293,6 +309,33 @@ export default function AdminImageStudioPage() {
     }
   }
 
+  if (loading && !app) {
+    return (
+      <main style={{ padding: 32 }}>
+        <p>加载应用配置…</p>
+      </main>
+    );
+  }
+
+  if (loadError && !app) {
+    return (
+      <main style={{ padding: 32, display: 'grid', gap: 12, maxWidth: 480 }}>
+        <p style={{ margin: 0, color: '#b91c1c' }}>加载失败：{loadError}</p>
+        <button
+          type="button"
+          onClick={() =>
+            void refresh().catch(() => {
+              /* loadError set in refresh */
+            })
+          }
+          style={actionBtn}
+        >
+          重试
+        </button>
+      </main>
+    );
+  }
+
   if (!app) {
     return (
       <main style={{ padding: 32 }}>
@@ -302,6 +345,9 @@ export default function AdminImageStudioPage() {
   }
 
   const showForm = creating || editingId !== null;
+  const editingIsDefault = Boolean(
+    editingId && models.find((m) => m.id === editingId)?.isDefault,
+  );
 
   return (
     <main style={{ padding: 32, maxWidth: 820, display: 'grid', gap: 24 }}>
@@ -503,7 +549,12 @@ export default function AdminImageStudioPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={busyId === m.id}
+                  disabled={busyId === m.id || m.provider === 'gemini'}
+                  title={
+                    m.provider === 'gemini'
+                      ? 'Gemini 连接测试暂未实现'
+                      : undefined
+                  }
                   onClick={() => void testModel(m.id)}
                   style={actionBtn}
                 >
@@ -634,11 +685,22 @@ export default function AdminImageStudioPage() {
                 启用
               </label>
               <label
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  opacity: editingIsDefault ? 0.7 : 1,
+                }}
+                title={
+                  editingIsDefault
+                    ? '当前默认模型不可取消；请先将其他模型设为默认'
+                    : undefined
+                }
               >
                 <input
                   type="checkbox"
-                  checked={form.isDefault}
+                  checked={editingIsDefault ? true : form.isDefault}
+                  disabled={editingIsDefault}
                   onChange={(e) =>
                     setForm({ ...form, isDefault: e.target.checked })
                   }
