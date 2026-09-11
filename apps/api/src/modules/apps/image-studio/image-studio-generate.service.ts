@@ -40,9 +40,18 @@ export class ImageStudioGenerateService {
       throw new BadRequestException('该 provider 暂未实现');
     }
 
+    const capabilities = parseModelCapabilities(model.capabilities);
+    const sourceAssetId = input.sourceAssetId ?? null;
+    if (sourceAssetId) {
+      if (!capabilities.imageToImage) {
+        throw new BadRequestException('当前模型不支持图生图');
+      }
+    } else if (!capabilities.textToImage) {
+      throw new BadRequestException('当前模型不支持文生图');
+    }
+
     let sourceImage: Buffer | undefined;
     let sourceMime: string | undefined;
-    const sourceAssetId = input.sourceAssetId ?? null;
     if (sourceAssetId) {
       const source = await this.prisma.imageStudioAsset.findFirst({
         where: { id: sourceAssetId, projectId: project.id },
@@ -235,6 +244,20 @@ export class ImageStudioGenerateService {
       })),
     };
   }
+}
+
+function parseModelCapabilities(raw: unknown): {
+  textToImage: boolean;
+  imageToImage: boolean;
+} {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return { textToImage: false, imageToImage: false };
+  }
+  const caps = raw as Record<string, unknown>;
+  return {
+    textToImage: caps.textToImage === true,
+    imageToImage: caps.imageToImage === true,
+  };
 }
 
 function extensionForMime(mime: string): string {

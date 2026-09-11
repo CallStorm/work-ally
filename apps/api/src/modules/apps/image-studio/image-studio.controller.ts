@@ -137,6 +137,8 @@ export class ImageStudioController {
   ) {
     const file = await this.assets.getContent(user, id);
     res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Referrer-Policy', 'no-referrer');
     res.send(file.buffer);
   }
 

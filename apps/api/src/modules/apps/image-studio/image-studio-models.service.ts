@@ -257,6 +257,7 @@ export class ImageStudioModelsService {
       provider: row.provider,
       baseUrl: row.baseUrl,
       modelName: row.modelName,
+      capabilities: row.capabilities,
       defaultParams: (row.defaultParams ?? {}) as Record<string, unknown>,
       apiKey,
     };

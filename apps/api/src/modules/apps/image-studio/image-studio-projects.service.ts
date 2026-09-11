@@ -58,6 +58,17 @@ export class ImageStudioProjectsService {
       await this.assertDefaultModel(user.tenantId, input.defaultModelId);
     }
 
+    let currentAssetIdToSet: string | null | undefined = undefined;
+    if (input.currentAssetId !== undefined) {
+      if (input.currentAssetId !== null) {
+        const asset = await this.prisma.imageStudioAsset.findFirst({
+          where: { id: input.currentAssetId, projectId: existing.id },
+        });
+        if (!asset) throw new NotFoundException('资源不存在');
+      }
+      currentAssetIdToSet = input.currentAssetId;
+    }
+
     const data: Prisma.ImageStudioProjectUncheckedUpdateInput = {};
     if (input.name !== undefined) data.name = input.name.trim();
     if (input.description !== undefined) data.description = input.description;
@@ -65,8 +76,8 @@ export class ImageStudioProjectsService {
     if (input.defaultModelId !== undefined) {
       data.defaultModelId = input.defaultModelId;
     }
-    if (input.currentAssetId !== undefined) {
-      data.currentAssetId = input.currentAssetId;
+    if (currentAssetIdToSet !== undefined) {
+      data.currentAssetId = currentAssetIdToSet;
     }
     if (input.workspaceState !== undefined) {
       data.workspaceState =
@@ -75,16 +86,32 @@ export class ImageStudioProjectsService {
           : (input.workspaceState as Prisma.InputJsonValue);
     }
 
-    const result = await this.prisma.imageStudioProject.updateMany({
-      where: {
-        id: existing.id,
-        tenantId: user.tenantId,
-        userId: user.userId,
-        deletedAt: null,
-      },
-      data,
+    await this.prisma.$transaction(async (tx) => {
+      const result = await tx.imageStudioProject.updateMany({
+        where: {
+          id: existing.id,
+          tenantId: user.tenantId,
+          userId: user.userId,
+          deletedAt: null,
+        },
+        data,
+      });
+      if (result.count === 0) throw new NotFoundException('项目不存在');
+
+      // Keep selected flags aligned with currentAssetId (same as select endpoint).
+      if (currentAssetIdToSet !== undefined) {
+        await tx.imageStudioAsset.updateMany({
+          where: { projectId: existing.id, selected: true },
+          data: { selected: false },
+        });
+        if (currentAssetIdToSet !== null) {
+          await tx.imageStudioAsset.updateMany({
+            where: { id: currentAssetIdToSet, projectId: existing.id },
+            data: { selected: true },
+          });
+        }
+      }
     });
-    if (result.count === 0) throw new NotFoundException('项目不存在');
 
     const row = await this.prisma.imageStudioProject.findFirst({
       where: {
