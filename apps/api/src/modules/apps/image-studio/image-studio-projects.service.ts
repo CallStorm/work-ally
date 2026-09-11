@@ -1,0 +1,140 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import type { ImageStudioProject } from '@prisma/client';
+import type {
+  CreateImageStudioProjectInput,
+  UpdateImageStudioProjectInput,
+} from '@work-ally/shared';
+import type { AuthUser } from '../../../common/current-user.decorator';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { ImageStudioModelsService } from './image-studio-models.service';
+
+@Injectable()
+export class ImageStudioProjectsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly models: ImageStudioModelsService,
+  ) {}
+
+  async list(user: AuthUser) {
+    const rows = await this.prisma.imageStudioProject.findMany({
+      where: {
+        tenantId: user.tenantId,
+        userId: user.userId,
+        deletedAt: null,
+      },
+      orderBy: [{ starred: 'desc' }, { updatedAt: 'desc' }],
+    });
+    return rows.map((row) => this.serialize(row));
+  }
+
+  async get(user: AuthUser, id: string) {
+    return this.serialize(await this.findOwned(user, id));
+  }
+
+  async create(user: AuthUser, input: CreateImageStudioProjectInput) {
+    await this.assertDefaultModel(user.tenantId, input.defaultModelId ?? null);
+
+    const row = await this.prisma.imageStudioProject.create({
+      data: {
+        tenantId: user.tenantId,
+        userId: user.userId,
+        name: input.name.trim(),
+        description: input.description ?? '',
+        defaultModelId: input.defaultModelId ?? null,
+      },
+    });
+    return this.serialize(row);
+  }
+
+  async update(
+    user: AuthUser,
+    id: string,
+    input: UpdateImageStudioProjectInput,
+  ) {
+    const existing = await this.findOwned(user, id);
+
+    if (input.defaultModelId !== undefined) {
+      await this.assertDefaultModel(user.tenantId, input.defaultModelId);
+    }
+
+    const data: Prisma.ImageStudioProjectUncheckedUpdateInput = {};
+    if (input.name !== undefined) data.name = input.name.trim();
+    if (input.description !== undefined) data.description = input.description;
+    if (input.starred !== undefined) data.starred = input.starred;
+    if (input.defaultModelId !== undefined) {
+      data.defaultModelId = input.defaultModelId;
+    }
+    if (input.currentAssetId !== undefined) {
+      data.currentAssetId = input.currentAssetId;
+    }
+    if (input.workspaceState !== undefined) {
+      data.workspaceState =
+        input.workspaceState === null
+          ? Prisma.DbNull
+          : (input.workspaceState as Prisma.InputJsonValue);
+    }
+
+    const row = await this.prisma.imageStudioProject.update({
+      where: { id: existing.id },
+      data,
+    });
+    return this.serialize(row);
+  }
+
+  async softDelete(user: AuthUser, id: string) {
+    const existing = await this.findOwned(user, id);
+    await this.prisma.imageStudioProject.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date() },
+    });
+    return { ok: true };
+  }
+
+  async listPublicModels(tenantId: string) {
+    const rows = await this.prisma.imageStudioModel.findMany({
+      where: { tenantId, enabled: true },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
+    return rows.map((row) => this.models.serializePublic(row));
+  }
+
+  async findOwned(user: AuthUser, id: string) {
+    const p = await this.prisma.imageStudioProject.findFirst({
+      where: {
+        id,
+        tenantId: user.tenantId,
+        userId: user.userId,
+        deletedAt: null,
+      },
+    });
+    if (!p) throw new NotFoundException('项目不存在');
+    return p;
+  }
+
+  private async assertDefaultModel(
+    tenantId: string,
+    defaultModelId: string | null,
+  ) {
+    if (defaultModelId == null) return;
+    const model = await this.prisma.imageStudioModel.findFirst({
+      where: { id: defaultModelId, tenantId },
+    });
+    if (!model) throw new NotFoundException('模型不存在');
+  }
+
+  private serialize(row: ImageStudioProject) {
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      coverObjectKey: row.coverObjectKey,
+      currentAssetId: row.currentAssetId,
+      defaultModelId: row.defaultModelId,
+      starred: row.starred,
+      workspaceState: row.workspaceState,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    };
+  }
+}
