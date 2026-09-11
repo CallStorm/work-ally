@@ -7,6 +7,8 @@ import { AppsController } from './apps.controller';
 import { AdminAppsController } from './admin-apps.controller';
 import { NotesAppGuard } from './notes-app.guard';
 import { ImageStudioAppGuard } from './image-studio-app.guard';
+import { AdminImageStudioController } from './image-studio/admin-image-studio.controller';
+import { ImageStudioModelsService } from './image-studio/image-studio-models.service';
 import { NotesController } from './notes/notes.controller';
 import { HandbookCategoriesService } from './notes/handbook-categories.service';
 import { HandbookNotesService } from './notes/handbook-notes.service';
@@ -22,6 +24,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
   controllers: [
     AppsController,
     AdminAppsController,
+    AdminImageStudioController,
     TasksController,
     NotesController,
   ],
@@ -30,6 +33,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     StickiesAppGuard,
     NotesAppGuard,
     ImageStudioAppGuard,
+    ImageStudioModelsService,
     HandbookCategoriesService,
     HandbookNotesService,
     NotesAiService,
@@ -37,6 +41,6 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     TaskNotificationsService,
     TaskReminderScheduler,
   ],
-  exports: [AppRegistryService],
+  exports: [AppRegistryService, ImageStudioModelsService],
 })
 export class AppsModule {}
