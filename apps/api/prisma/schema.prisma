@@ -108,6 +108,8 @@ model Tenant {
   handbookCategories HandbookCategory[]
   handbookNotes      HandbookNote[]
   notesAiThreads     NotesAiThread[]
+  imageStudioModels   ImageStudioModel[]
+  imageStudioProjects ImageStudioProject[]
 
   @@map("tenants")
 }
@@ -642,4 +644,93 @@ model NotesAiMessage {
 
   @@index([threadId, createdAt])
   @@map("notes_ai_messages")
+}
+
+model ImageStudioModel {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  name           String
+  provider       String   @default("openai_compatible")
+  baseUrl        String   @map("base_url") @db.VarChar(512)
+  apiKeyEnc      String   @map("api_key_enc") @db.Text
+  modelName      String   @map("model_name") @db.VarChar(191)
+  capabilities   Json
+  defaultParams  Json     @default("{}") @map("default_params")
+  enabled        Boolean  @default(true)
+  isDefault      Boolean  @default(false) @map("is_default")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projects ImageStudioProject[]
+  turns    ImageStudioTurn[]
+
+  @@index([tenantId, enabled])
+  @@map("image_studio_models")
+}
+
+model ImageStudioProject {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  userId          String    @map("user_id")
+  name            String    @db.VarChar(128)
+  description     String    @default("") @db.VarChar(2000)
+  coverObjectKey  String?   @map("cover_object_key") @db.VarChar(512)
+  currentAssetId  String?   @map("current_asset_id")
+  defaultModelId  String?   @map("default_model_id")
+  starred         Boolean   @default(false)
+  deletedAt       DateTime? @map("deleted_at")
+  workspaceState  Json?     @map("workspace_state")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  tenant       Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  defaultModel ImageStudioModel?  @relation(fields: [defaultModelId], references: [id], onDelete: SetNull)
+  turns        ImageStudioTurn[]
+  assets       ImageStudioAsset[]
+
+  @@index([tenantId, userId, deletedAt])
+  @@index([tenantId, userId, updatedAt])
+  @@map("image_studio_projects")
+}
+
+model ImageStudioTurn {
+  id            String   @id @default(cuid())
+  projectId     String   @map("project_id")
+  parentTurnId  String?  @map("parent_turn_id")
+  prompt        String   @db.Text
+  modelId       String   @map("model_id")
+  sourceAssetId String?  @map("source_asset_id")
+  status        String   @default("pending") // pending|running|done|failed
+  errorMessage  String?  @map("error_message") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  project ImageStudioProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  model   ImageStudioModel   @relation(fields: [modelId], references: [id])
+  parent  ImageStudioTurn?   @relation("TurnTree", fields: [parentTurnId], references: [id], onDelete: SetNull)
+  children ImageStudioTurn[] @relation("TurnTree")
+  assets  ImageStudioAsset[]
+
+  @@index([projectId, createdAt])
+  @@map("image_studio_turns")
+}
+
+model ImageStudioAsset {
+  id        String   @id @default(cuid())
+  projectId String   @map("project_id")
+  turnId    String?  @map("turn_id")
+  objectKey String   @map("object_key") @db.VarChar(512)
+  width     Int?
+  height    Int?
+  mimeType  String   @default("image/png") @map("mime_type") @db.VarChar(128)
+  selected  Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project ImageStudioProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  turn    ImageStudioTurn?   @relation(fields: [turnId], references: [id], onDelete: SetNull)
+
+  @@index([projectId, createdAt])
+  @@index([turnId])
+  @@map("image_studio_assets")
 }
