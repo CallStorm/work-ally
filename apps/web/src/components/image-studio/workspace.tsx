@@ -60,14 +60,13 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const turnsEndRef = useRef<HTMLDivElement>(null);
+  const onProjectUpdatedRef = useRef(onProjectUpdated);
+  onProjectUpdatedRef.current = onProjectUpdated;
 
-  const applyProject = useCallback(
-    (next: ImageStudioProject) => {
-      setProject(next);
-      onProjectUpdated?.(next);
-    },
-    [onProjectUpdated],
-  );
+  const applyProject = useCallback((next: ImageStudioProject) => {
+    setProject(next);
+    onProjectUpdatedRef.current?.(next);
+  }, []);
 
   const refresh = useCallback(async () => {
     const [proj, turnList] = await Promise.all([
@@ -161,7 +160,14 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
       }
       await refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : '生成失败，请稍后重试');
+      setError(
+        err instanceof Error ? err.message : '生成失败，请稍后重试',
+      );
+      try {
+        await refresh();
+      } catch {
+        // ignore refresh failure after generate/timeout error
+      }
     } finally {
       setGenerating(false);
       setActiveTurnStatus(null);

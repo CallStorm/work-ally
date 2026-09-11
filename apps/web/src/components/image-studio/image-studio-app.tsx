@@ -102,6 +102,12 @@ export function ImageStudioApp() {
     }
   }
 
+  const onProjectUpdated = useCallback((updated: ImageStudioProject) => {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === updated.id ? updated : p)),
+    );
+  }, []);
+
   if (!ready) {
     return (
       <div className="image-studio-app">
@@ -128,11 +134,7 @@ export function ImageStudioApp() {
             setProjectId(null);
             void loadProjects();
           }}
-          onProjectUpdated={(updated) => {
-            setProjects((prev) =>
-              prev.map((p) => (p.id === updated.id ? updated : p)),
-            );
-          }}
+          onProjectUpdated={onProjectUpdated}
         />
       </div>
     );
