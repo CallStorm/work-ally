@@ -11,6 +11,44 @@ export type ImageStudioProject = {
   updatedAt: string;
 };
 
+export type ImageStudioPublicModel = {
+  id: string;
+  name: string;
+  provider: string;
+  modelName: string;
+  capabilities: {
+    textToImage?: boolean;
+    imageToImage?: boolean;
+  };
+  isDefault: boolean;
+  enabled: boolean;
+};
+
+export type ImageStudioAsset = {
+  id: string;
+  projectId: string;
+  turnId: string | null;
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+  selected: boolean;
+  createdAt: string;
+};
+
+export type ImageStudioTurn = {
+  id: string;
+  projectId: string;
+  parentTurnId: string | null;
+  prompt: string;
+  modelId: string;
+  sourceAssetId: string | null;
+  status: 'running' | 'done' | 'failed' | string;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+  assets: ImageStudioAsset[];
+};
+
 export type ImageStudioView = 'library' | 'workspace';
 
 export type ProjectLibraryFilter = 'all' | 'starred';

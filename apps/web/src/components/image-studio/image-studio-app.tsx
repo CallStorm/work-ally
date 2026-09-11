@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ApiError, apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { ProjectLibrary } from './project-library';
+import { Workspace } from './workspace';
 import type { ImageStudioProject, ImageStudioView } from './types';
 
 export function ImageStudioApp() {
@@ -118,26 +119,21 @@ export function ImageStudioApp() {
   }
 
   if (view === 'workspace' && projectId) {
-    const project = projects.find((p) => p.id === projectId);
     return (
-      <div className="image-studio-app">
-        <div className="image-studio-workspace-stub">
-          <button
-            type="button"
-            className="image-studio-btn"
-            onClick={() => {
-              setView('library');
-              setProjectId(null);
-            }}
-          >
-            ← 返回项目库
-          </button>
-          <h1>{project?.name ?? '工作台'}</h1>
-          <p>打开工作台</p>
-          <p className="image-studio-workspace-stub__hint">
-            工作台画布与生成对话将在下一任务接入（projectId: {projectId}）。
-          </p>
-        </div>
+      <div className="image-studio-app image-studio-app--workspace">
+        <Workspace
+          projectId={projectId}
+          onBack={() => {
+            setView('library');
+            setProjectId(null);
+            void loadProjects();
+          }}
+          onProjectUpdated={(updated) => {
+            setProjects((prev) =>
+              prev.map((p) => (p.id === updated.id ? updated : p)),
+            );
+          }}
+        />
       </div>
     );
   }
