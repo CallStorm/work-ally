@@ -75,19 +75,41 @@ export class ImageStudioProjectsService {
           : (input.workspaceState as Prisma.InputJsonValue);
     }
 
-    const row = await this.prisma.imageStudioProject.update({
-      where: { id: existing.id },
+    const result = await this.prisma.imageStudioProject.updateMany({
+      where: {
+        id: existing.id,
+        tenantId: user.tenantId,
+        userId: user.userId,
+        deletedAt: null,
+      },
       data,
     });
+    if (result.count === 0) throw new NotFoundException('项目不存在');
+
+    const row = await this.prisma.imageStudioProject.findFirst({
+      where: {
+        id: existing.id,
+        tenantId: user.tenantId,
+        userId: user.userId,
+        deletedAt: null,
+      },
+    });
+    if (!row) throw new NotFoundException('项目不存在');
     return this.serialize(row);
   }
 
   async softDelete(user: AuthUser, id: string) {
     const existing = await this.findOwned(user, id);
-    await this.prisma.imageStudioProject.update({
-      where: { id: existing.id },
+    const result = await this.prisma.imageStudioProject.updateMany({
+      where: {
+        id: existing.id,
+        tenantId: user.tenantId,
+        userId: user.userId,
+        deletedAt: null,
+      },
       data: { deletedAt: new Date() },
     });
+    if (result.count === 0) throw new NotFoundException('项目不存在');
     return { ok: true };
   }
 
@@ -118,7 +140,7 @@ export class ImageStudioProjectsService {
   ) {
     if (defaultModelId == null) return;
     const model = await this.prisma.imageStudioModel.findFirst({
-      where: { id: defaultModelId, tenantId },
+      where: { id: defaultModelId, tenantId, enabled: true },
     });
     if (!model) throw new NotFoundException('模型不存在');
   }
