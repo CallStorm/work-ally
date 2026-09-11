@@ -10,7 +10,11 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { ObjectStorageService } from '../../storage/object-storage.service';
 import { ImageStudioModelsService } from './image-studio-models.service';
 import { ImageStudioProjectsService } from './image-studio-projects.service';
-import { openaiCompatibleImages } from './providers/openai-compatible-images';
+import {
+  openaiCompatibleImages,
+  OpenAiCompatibleImagesError,
+  formatProviderError,
+} from './providers/openai-compatible-images';
 
 @Injectable()
 export class ImageStudioGenerateService {
@@ -73,6 +77,7 @@ export class ImageStudioGenerateService {
       },
     });
 
+    const createdAssets: ImageStudioAsset[] = [];
     try {
       const images = await openaiCompatibleImages({
         baseUrl: model.baseUrl,
@@ -85,7 +90,6 @@ export class ImageStudioGenerateService {
         defaultParams: model.defaultParams,
       });
 
-      const createdAssets: ImageStudioAsset[] = [];
       for (const image of images) {
         const pending = await this.prisma.imageStudioAsset.create({
           data: {
@@ -95,6 +99,7 @@ export class ImageStudioGenerateService {
             mimeType: image.mimeType,
           },
         });
+        createdAssets.push(pending);
         const ext = extensionForMime(image.mimeType);
         const objectKey = `image-studio/${user.tenantId}/${user.userId}/${project.id}/${pending.id}.${ext}`;
         await this.storage.putObject(objectKey, image.buffer, image.mimeType);
@@ -102,7 +107,8 @@ export class ImageStudioGenerateService {
           where: { id: pending.id },
           data: { objectKey },
         });
-        createdAssets.push(asset);
+        const idx = createdAssets.findIndex((a) => a.id === pending.id);
+        if (idx >= 0) createdAssets[idx] = asset;
       }
 
       const done = await this.prisma.imageStudioTurn.update({
@@ -140,16 +146,39 @@ export class ImageStudioGenerateService {
 
       return this.serializeTurn(done, createdAssets);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      await this.cleanupFailedTurnAssets(turn.id);
+
+      const errorMessage =
+        err instanceof OpenAiCompatibleImagesError
+          ? err.sanitizedMessage.slice(0, 2000)
+          : formatProviderError(
+              err instanceof Error ? err.message : String(err),
+            ).slice(0, 2000);
+
       const failed = await this.prisma.imageStudioTurn.update({
         where: { id: turn.id },
         data: {
           status: 'failed',
-          errorMessage: message.slice(0, 2000),
+          errorMessage,
         },
       });
       return this.serializeTurn(failed, []);
     }
+  }
+
+  private async cleanupFailedTurnAssets(turnId: string) {
+    const assets = await this.prisma.imageStudioAsset.findMany({
+      where: { turnId },
+    });
+    if (!assets.length) return;
+    for (const asset of assets) {
+      if (asset.objectKey && asset.objectKey !== 'pending') {
+        await this.storage.deleteObject(asset.objectKey).catch(() => undefined);
+      }
+    }
+    await this.prisma.imageStudioAsset
+      .deleteMany({ where: { turnId } })
+      .catch(() => undefined);
   }
 
   async getTurn(user: AuthUser, turnId: string) {

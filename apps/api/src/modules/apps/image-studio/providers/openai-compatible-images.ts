@@ -3,6 +3,18 @@ export type OpenAiCompatibleImageResult = {
   mimeType: string;
 };
 
+export class OpenAiCompatibleImagesError extends Error {
+  readonly status?: number;
+  readonly sanitizedMessage: string;
+
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'OpenAiCompatibleImagesError';
+    this.status = status;
+    this.sanitizedMessage = formatProviderError(message, status);
+  }
+}
+
 export async function openaiCompatibleImages(opts: {
   baseUrl: string;
   apiKey: string;
@@ -14,6 +26,8 @@ export async function openaiCompatibleImages(opts: {
   defaultParams?: Record<string, unknown>;
 }): Promise<OpenAiCompatibleImageResult[]> {
   const root = opts.baseUrl.replace(/\/$/, '');
+  const n = Math.min(Math.max(1, Math.floor(opts.n) || 1), 4);
+
   if (!opts.sourceImage) {
     const res = await fetch(`${root}/images/generations`, {
       method: 'POST',
@@ -25,11 +39,14 @@ export async function openaiCompatibleImages(opts: {
         ...(opts.defaultParams ?? {}),
         model: opts.modelName,
         prompt: opts.prompt,
-        n: opts.n,
+        n,
         response_format: 'b64_json',
       }),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new OpenAiCompatibleImagesError(body || res.statusText, res.status);
+    }
     const json = (await res.json()) as {
       data?: Array<{ b64_json?: string; url?: string }>;
     };
@@ -44,17 +61,26 @@ export async function openaiCompatibleImages(opts: {
     new Blob([opts.sourceImage], { type: mime }),
     filename,
   );
-  form.append('model', opts.modelName);
-  form.append('prompt', opts.prompt);
-  form.append('n', String(opts.n));
-  form.append('response_format', 'b64_json');
   for (const [key, value] of Object.entries(opts.defaultParams ?? {})) {
     if (value === undefined || value === null) continue;
+    if (
+      key === 'model' ||
+      key === 'prompt' ||
+      key === 'n' ||
+      key === 'response_format' ||
+      key === 'image'
+    ) {
+      continue;
+    }
     form.append(
       key,
       typeof value === 'string' ? value : JSON.stringify(value),
     );
   }
+  form.append('model', opts.modelName);
+  form.append('prompt', opts.prompt);
+  form.append('n', String(n));
+  form.append('response_format', 'b64_json');
 
   const res = await fetch(`${root}/images/edits`, {
     method: 'POST',
@@ -63,18 +89,42 @@ export async function openaiCompatibleImages(opts: {
     },
     body: form,
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new OpenAiCompatibleImagesError(body || res.statusText, res.status);
+  }
   const json = (await res.json()) as {
     data?: Array<{ b64_json?: string; url?: string }>;
   };
   return decodeImageData(json.data ?? []);
 }
 
+export function sanitizeProviderSnippet(raw: string): string {
+  return raw
+    .replace(/sk-[A-Za-z0-9_-]+/g, '[redacted]')
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [redacted]')
+    .replace(
+      /(?:api[_-]?key|apiKey|access[_-]?token|secret)["']?\s*[:=]\s*["']?[^"'&\s,}+]+/gi,
+      '[redacted]',
+    )
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function formatProviderError(raw: string, status?: number): string {
+  const prefix =
+    status != null
+      ? `上游生图失败（HTTP ${status}）`
+      : '上游生图失败';
+  const snippet = sanitizeProviderSnippet(raw).slice(0, 200);
+  return snippet ? `${prefix}：${snippet}` : prefix;
+}
+
 async function decodeImageData(
   data: Array<{ b64_json?: string; url?: string }>,
 ): Promise<OpenAiCompatibleImageResult[]> {
   if (!data.length) {
-    throw new Error('Provider returned no images');
+    throw new OpenAiCompatibleImagesError('Provider returned no images');
   }
   const out: OpenAiCompatibleImageResult[] = [];
   for (const item of data) {
@@ -86,7 +136,10 @@ async function decodeImageData(
     if (item.url) {
       const imgRes = await fetch(item.url);
       if (!imgRes.ok) {
-        throw new Error(`Failed to download image url (${imgRes.status})`);
+        throw new OpenAiCompatibleImagesError(
+          `Failed to download image url`,
+          imgRes.status,
+        );
       }
       const buffer = Buffer.from(await imgRes.arrayBuffer());
       const headerType = imgRes.headers.get('content-type');
@@ -97,7 +150,9 @@ async function decodeImageData(
       out.push({ buffer, mimeType });
       continue;
     }
-    throw new Error('Provider image item missing b64_json and url');
+    throw new OpenAiCompatibleImagesError(
+      'Provider image item missing b64_json and url',
+    );
   }
   return out;
 }
