@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -6,8 +7,13 @@ import {
   Param,
   Patch,
   Post,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import {
   CreateImageStudioProjectSchema,
   UpdateImageStudioProjectSchema,
@@ -16,12 +22,19 @@ import { CurrentUser, type AuthUser } from '../../../common/current-user.decorat
 import { JwtAuthGuard } from '../../../common/jwt-auth.guard';
 import { parseBody } from '../../../common/zod';
 import { ImageStudioAppGuard } from '../image-studio-app.guard';
+import { ImageStudioAssetsService } from './image-studio-assets.service';
 import { ImageStudioProjectsService } from './image-studio-projects.service';
+
+const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+const UPLOAD_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 @Controller('apps/image-studio')
 @UseGuards(JwtAuthGuard, ImageStudioAppGuard)
 export class ImageStudioController {
-  constructor(private readonly projects: ImageStudioProjectsService) {}
+  constructor(
+    private readonly projects: ImageStudioProjectsService,
+    private readonly assets: ImageStudioAssetsService,
+  ) {}
 
   @Get('projects')
   listProjects(@CurrentUser() user: AuthUser) {
@@ -57,6 +70,48 @@ export class ImageStudioController {
   @Delete('projects/:id')
   deleteProject(@CurrentUser() user: AuthUser, @Param('id') id: string) {
     return this.projects.softDelete(user, id);
+  }
+
+  @Post('projects/:id/upload')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: UPLOAD_MAX_BYTES },
+      fileFilter: (_req, file, cb) => {
+        if (!UPLOAD_MIME.has(file.mimetype)) {
+          cb(new BadRequestException('仅支持 png/jpeg/webp') as Error, false);
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  upload(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.assets.upload(user, id, file);
+  }
+
+  @Post('projects/:id/assets/:assetId/select')
+  selectAsset(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Param('assetId') assetId: string,
+  ) {
+    return this.assets.select(user, id, assetId);
+  }
+
+  /** Supports Authorization bearer or ?access_token= (JwtStrategy extractors). */
+  @Get('assets/:id/content')
+  async assetContent(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const file = await this.assets.getContent(user, id);
+    res.setHeader('Content-Type', file.mimeType);
+    res.send(file.buffer);
   }
 
   @Get('models')

@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AclModule } from '../acl/acl.module';
 import { ModelsModule } from '../models/models.module';
+import { StorageModule } from '../storage/storage.module';
 import { AppRegistryService } from './app-registry.service';
 import { AppsController } from './apps.controller';
 import { AdminAppsController } from './admin-apps.controller';
 import { NotesAppGuard } from './notes-app.guard';
 import { ImageStudioAppGuard } from './image-studio-app.guard';
 import { AdminImageStudioController } from './image-studio/admin-image-studio.controller';
+import { ImageStudioAssetsService } from './image-studio/image-studio-assets.service';
 import { ImageStudioController } from './image-studio/image-studio.controller';
 import { ImageStudioModelsService } from './image-studio/image-studio-models.service';
 import { ImageStudioProjectsService } from './image-studio/image-studio-projects.service';
@@ -22,7 +24,7 @@ import { TaskNotificationsService } from './tasks/task-notifications.service';
 import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), AclModule, ModelsModule],
+  imports: [ScheduleModule.forRoot(), AclModule, ModelsModule, StorageModule],
   controllers: [
     AppsController,
     AdminAppsController,
@@ -38,6 +40,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     ImageStudioAppGuard,
     ImageStudioModelsService,
     ImageStudioProjectsService,
+    ImageStudioAssetsService,
     HandbookCategoriesService,
     HandbookNotesService,
     NotesAiService,
