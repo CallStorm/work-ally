@@ -28,10 +28,12 @@ export default function AppsListPage() {
         {apps.map((app) => {
           const isStickies = app.slug === 'stickies';
           const isNotes = app.slug === 'notes';
+          const isImageStudio = app.slug === 'image-studio';
           const cardClass = [
             'apps-list-page__card',
             isStickies ? 'apps-list-page__card--stickies' : '',
             isNotes ? 'apps-list-page__card--handbook' : '',
+            isImageStudio ? 'apps-list-page__card--image-studio' : '',
           ]
             .filter(Boolean)
             .join(' ');
@@ -49,6 +51,10 @@ export default function AppsListPage() {
                 <div className="apps-list-page__cover" aria-hidden>
                   <span className="apps-list-page__book" />
                 </div>
+              ) : isImageStudio ? (
+                <div className="apps-list-page__cover" aria-hidden>
+                  <span className="apps-list-page__frame" />
+                </div>
               ) : (
                 <span className="apps-list-page__icon">◆</span>
               )}
@@ -60,6 +66,9 @@ export default function AppsListPage() {
                 )}
                 {isNotes && (
                   <span className="apps-list-page__meta">分类 · Markdown · 搜索 · AI</span>
+                )}
+                {isImageStudio && (
+                  <span className="apps-list-page__meta">项目 · 文生图 · 图生图</span>
                 )}
               </div>
             </Link>
