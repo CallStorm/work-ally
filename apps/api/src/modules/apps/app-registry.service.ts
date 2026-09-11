@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 
-import { NOTES_SLUG, STICKIES_SLUG } from '@work-ally/shared';
+import { IMAGE_STUDIO_SLUG, NOTES_SLUG, STICKIES_SLUG } from '@work-ally/shared';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
@@ -32,7 +32,11 @@ export const NOTES_DEFAULT = {
 
 };
 
-
+export const IMAGE_STUDIO_DEFAULT = {
+  slug: IMAGE_STUDIO_SLUG,
+  name: '图工作室',
+  description: '个人图像创作：项目、文生图/图生图与版本回合',
+};
 
 @Injectable()
 
@@ -161,11 +165,45 @@ export class AppRegistryService {
     await this.prisma.appRegistry.delete({ where: { id: legacy.id } });
   }
 
+  async ensureImageStudio(tenantId: string, ownerUserId: string) {
+    const existing = await this.prisma.appRegistry.findUnique({
+      where: { tenantId_slug: { tenantId, slug: IMAGE_STUDIO_SLUG } },
+    });
+    if (existing) {
+      if (
+        existing.name !== IMAGE_STUDIO_DEFAULT.name ||
+        existing.description !== IMAGE_STUDIO_DEFAULT.description
+      ) {
+        return this.prisma.appRegistry.update({
+          where: { id: existing.id },
+          data: {
+            name: IMAGE_STUDIO_DEFAULT.name,
+            description: IMAGE_STUDIO_DEFAULT.description,
+          },
+        });
+      }
+      return existing;
+    }
+    return this.prisma.appRegistry.create({
+      data: {
+        tenantId,
+        slug: IMAGE_STUDIO_SLUG,
+        name: IMAGE_STUDIO_DEFAULT.name,
+        description: IMAGE_STUDIO_DEFAULT.description,
+        ownerUserId,
+        visibility: 'tenant',
+        enabled: true,
+      },
+    });
+  }
+
   async listForAdmin(tenantId: string, ownerUserId: string) {
 
     await this.ensureStickies(tenantId, ownerUserId);
 
     await this.ensureNotes(tenantId, ownerUserId);
+
+    await this.ensureImageStudio(tenantId, ownerUserId);
 
     const rows = await this.prisma.appRegistry.findMany({
 
@@ -205,7 +243,7 @@ export class AppRegistryService {
 
     await this.ensureNotes(user.tenantId, ownerId);
 
-
+    await this.ensureImageStudio(user.tenantId, ownerId);
 
     const rows = await this.prisma.appRegistry.findMany({
 
@@ -269,6 +307,18 @@ export class AppRegistryService {
 
   }
 
+  async getImageStudioForUser(user: AuthUser) {
+    const admin = await this.prisma.membership.findFirst({
+      where: { tenantId: user.tenantId, role: 'admin', status: 'active' },
+      select: { userId: true },
+    });
+    await this.ensureImageStudio(user.tenantId, admin?.userId ?? user.userId);
+    const app = await this.getBySlug(user.tenantId, IMAGE_STUDIO_SLUG);
+    if (!app || !app.enabled) return null;
+    const ok = await this.acl.canUse(user, 'apps', app);
+    return ok ? app : null;
+  }
+
   async getStickiesAdmin(tenantId: string) {
 
     const admin = await this.prisma.membership.findFirst({
@@ -301,6 +351,15 @@ export class AppRegistryService {
 
     return this.ensureNotes(tenantId, admin.userId);
 
+  }
+
+  async getImageStudioAdmin(tenantId: string) {
+    const admin = await this.prisma.membership.findFirst({
+      where: { tenantId, role: 'admin', status: 'active' },
+      select: { userId: true },
+    });
+    if (!admin) return null;
+    return this.ensureImageStudio(tenantId, admin.userId);
   }
 
   async updateStickies(
@@ -367,6 +426,23 @@ export class AppRegistryService {
 
     });
 
+  }
+
+  async updateImageStudio(
+    tenantId: string,
+    body: {
+      enabled?: boolean;
+      defaultModelConfigId?: string | null;
+      aiActionsEnabled?: string[];
+      visibility?: 'private' | 'restricted' | 'tenant';
+    },
+  ) {
+    const app = await this.getImageStudioAdmin(tenantId);
+    if (!app) return null;
+    return this.prisma.appRegistry.update({
+      where: { id: app.id },
+      data: body,
+    });
   }
 
   serialize(row: {

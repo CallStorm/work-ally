@@ -6,6 +6,7 @@ import { AppRegistryService } from './app-registry.service';
 import { AppsController } from './apps.controller';
 import { AdminAppsController } from './admin-apps.controller';
 import { NotesAppGuard } from './notes-app.guard';
+import { ImageStudioAppGuard } from './image-studio-app.guard';
 import { NotesController } from './notes/notes.controller';
 import { HandbookCategoriesService } from './notes/handbook-categories.service';
 import { HandbookNotesService } from './notes/handbook-notes.service';
@@ -28,6 +29,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     AppRegistryService,
     StickiesAppGuard,
     NotesAppGuard,
+    ImageStudioAppGuard,
     HandbookCategoriesService,
     HandbookNotesService,
     NotesAiService,

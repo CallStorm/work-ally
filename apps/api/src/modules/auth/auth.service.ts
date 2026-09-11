@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { NOTES_SLUG, normalizePhone, STICKIES_SLUG } from '@work-ally/shared';
+import { IMAGE_STUDIO_SLUG, NOTES_SLUG, normalizePhone, STICKIES_SLUG } from '@work-ally/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { AuthUser } from '../../common/current-user.decorator';
 
@@ -96,6 +96,17 @@ export class AuthService {
           slug: NOTES_SLUG,
           name: '笔记',
           description: '个人工作笔记：分类、富文本、搜索与 AI 改稿',
+          ownerUserId: user.id,
+          visibility: 'tenant',
+          enabled: true,
+        },
+      });
+      await tx.appRegistry.create({
+        data: {
+          tenantId: tenant.id,
+          slug: IMAGE_STUDIO_SLUG,
+          name: '图工作室',
+          description: '个人图像创作：项目、文生图/图生图与版本回合',
           ownerUserId: user.id,
           visibility: 'tenant',
           enabled: true,
