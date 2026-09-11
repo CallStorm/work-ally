@@ -224,6 +224,44 @@ export class ImageStudioModelsService {
     };
   }
 
+  /** Server-side only — never serialize apiKey onto HTTP responses. */
+  async resolveEnabledWithApiKey(
+    tenantId: string,
+    preferredModelId: string | null | undefined,
+  ) {
+    let row: ImageStudioModel | null;
+    if (preferredModelId) {
+      row = await this.prisma.imageStudioModel.findFirst({
+        where: { id: preferredModelId, tenantId, enabled: true },
+      });
+      if (!row) throw new NotFoundException('模型不存在');
+    } else {
+      row = await this.prisma.imageStudioModel.findFirst({
+        where: { tenantId, enabled: true, isDefault: true },
+      });
+      if (!row) {
+        throw new BadRequestException('请先由管理员配置默认图像模型');
+      }
+    }
+
+    let apiKey: string;
+    try {
+      apiKey = decryptSecret(row.apiKeyEnc, this.encryptionKey());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new BadRequestException(`解密 API Key 失败: ${message}`);
+    }
+
+    return {
+      id: row.id,
+      provider: row.provider,
+      baseUrl: row.baseUrl,
+      modelName: row.modelName,
+      defaultParams: (row.defaultParams ?? {}) as Record<string, unknown>,
+      apiKey,
+    };
+  }
+
   private async requireModel(tenantId: string, id: string) {
     const row = await this.prisma.imageStudioModel.findFirst({
       where: { id, tenantId },

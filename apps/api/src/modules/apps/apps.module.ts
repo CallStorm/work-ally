@@ -11,6 +11,7 @@ import { ImageStudioAppGuard } from './image-studio-app.guard';
 import { AdminImageStudioController } from './image-studio/admin-image-studio.controller';
 import { ImageStudioAssetsService } from './image-studio/image-studio-assets.service';
 import { ImageStudioController } from './image-studio/image-studio.controller';
+import { ImageStudioGenerateService } from './image-studio/image-studio-generate.service';
 import { ImageStudioModelsService } from './image-studio/image-studio-models.service';
 import { ImageStudioProjectsService } from './image-studio/image-studio-projects.service';
 import { NotesController } from './notes/notes.controller';
@@ -41,6 +42,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     ImageStudioModelsService,
     ImageStudioProjectsService,
     ImageStudioAssetsService,
+    ImageStudioGenerateService,
     HandbookCategoriesService,
     HandbookNotesService,
     NotesAiService,

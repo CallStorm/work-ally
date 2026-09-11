@@ -16,6 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import {
   CreateImageStudioProjectSchema,
+  GenerateImageStudioSchema,
   UpdateImageStudioProjectSchema,
 } from '@work-ally/shared';
 import { CurrentUser, type AuthUser } from '../../../common/current-user.decorator';
@@ -23,6 +24,7 @@ import { JwtAuthGuard } from '../../../common/jwt-auth.guard';
 import { parseBody } from '../../../common/zod';
 import { ImageStudioAppGuard } from '../image-studio-app.guard';
 import { ImageStudioAssetsService } from './image-studio-assets.service';
+import { ImageStudioGenerateService } from './image-studio-generate.service';
 import { ImageStudioProjectsService } from './image-studio-projects.service';
 
 const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
@@ -34,6 +36,7 @@ export class ImageStudioController {
   constructor(
     private readonly projects: ImageStudioProjectsService,
     private readonly assets: ImageStudioAssetsService,
+    private readonly generateService: ImageStudioGenerateService,
   ) {}
 
   @Get('projects')
@@ -100,6 +103,29 @@ export class ImageStudioController {
     @Param('assetId') assetId: string,
   ) {
     return this.assets.select(user, id, assetId);
+  }
+
+  @Post('projects/:id/generate')
+  generate(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    return this.generateService.generate(
+      user,
+      id,
+      parseBody(GenerateImageStudioSchema, body),
+    );
+  }
+
+  @Get('projects/:id/turns')
+  listTurns(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.generateService.listTurns(user, id);
+  }
+
+  @Get('turns/:id')
+  getTurn(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.generateService.getTurn(user, id);
   }
 
   /** Supports Authorization bearer or ?access_token= (JwtStrategy extractors). */
