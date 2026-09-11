@@ -11,3 +11,5 @@ coverage
 .pnpm-store
 .data
 tsconfig.tsbuildinfo
+
+.worktrees/
