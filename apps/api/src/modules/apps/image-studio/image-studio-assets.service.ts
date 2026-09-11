@@ -106,7 +106,10 @@ export class ImageStudioAssetsService {
     try {
       const buffer = await this.storage.getObject(asset.objectKey);
       return { buffer, mimeType: asset.mimeType };
-    } catch {
+    } catch (err) {
+      if (isStorageObjectMissing(err)) {
+        throw new NotFoundException('资源不存在');
+      }
       throw new BadGatewayException('存储服务不可用');
     }
   }
@@ -160,4 +163,14 @@ function extensionForMime(mime: string): string {
     default:
       return 'bin';
   }
+}
+
+function isStorageObjectMissing(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.message.startsWith('Object not found:')) return true;
+  const name = (err as { name?: string }).name;
+  if (name === 'NoSuchKey' || name === 'NotFound') return true;
+  const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata
+    ?.httpStatusCode;
+  return status === 404;
 }
