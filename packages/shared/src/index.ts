@@ -208,6 +208,84 @@ export const UpdateHandbookNoteSchema = z.object({
 });
 export type UpdateHandbookNoteInput = z.infer<typeof UpdateHandbookNoteSchema>;
 
+export const IMAGE_STUDIO_SLUG = 'image-studio';
+
+export const ImageStudioProviderSchema = z.enum([
+  'openai_compatible',
+  'gemini',
+]);
+export type ImageStudioProvider = z.infer<typeof ImageStudioProviderSchema>;
+
+export const CreateImageStudioProjectSchema = z.object({
+  name: z.string().trim().min(1).max(128),
+  description: z.string().trim().max(2000).optional().default(''),
+  defaultModelId: z.string().cuid().nullable().optional(),
+});
+export type CreateImageStudioProjectInput = z.infer<
+  typeof CreateImageStudioProjectSchema
+>;
+
+export const UpdateImageStudioProjectSchema = z.object({
+  name: z.string().trim().min(1).max(128).optional(),
+  description: z.string().trim().max(2000).optional(),
+  starred: z.boolean().optional(),
+  defaultModelId: z.string().cuid().nullable().optional(),
+  currentAssetId: z.string().cuid().nullable().optional(),
+  workspaceState: z.record(z.unknown()).nullable().optional(),
+});
+export type UpdateImageStudioProjectInput = z.infer<
+  typeof UpdateImageStudioProjectSchema
+>;
+
+export const GenerateImageStudioSchema = z.object({
+  prompt: z.string().trim().min(1).max(4000),
+  modelId: z.string().cuid().optional(),
+  sourceAssetId: z.string().cuid().nullable().optional(),
+  n: z.number().int().min(1).max(4).optional().default(1),
+  parentTurnId: z.string().cuid().nullable().optional(),
+});
+export type GenerateImageStudioInput = z.infer<typeof GenerateImageStudioSchema>;
+
+export const CreateImageStudioModelSchema = z.object({
+  name: z.string().trim().min(1).max(128),
+  provider: ImageStudioProviderSchema.default('openai_compatible'),
+  baseUrl: z.string().url().max(512),
+  apiKey: z.string().trim().min(1).max(2048),
+  modelName: z.string().trim().min(1).max(191),
+  capabilities: z
+    .object({
+      textToImage: z.boolean().default(true),
+      imageToImage: z.boolean().default(true),
+    })
+    .default({ textToImage: true, imageToImage: true }),
+  defaultParams: z.record(z.unknown()).optional().default({}),
+  enabled: z.boolean().optional().default(true),
+  isDefault: z.boolean().optional().default(false),
+});
+export type CreateImageStudioModelInput = z.infer<
+  typeof CreateImageStudioModelSchema
+>;
+
+export const UpdateImageStudioModelSchema = z.object({
+  name: z.string().trim().min(1).max(128).optional(),
+  provider: ImageStudioProviderSchema.optional(),
+  baseUrl: z.string().url().max(512).optional(),
+  apiKey: z.string().trim().min(1).max(2048).optional(),
+  modelName: z.string().trim().min(1).max(191).optional(),
+  capabilities: z
+    .object({
+      textToImage: z.boolean(),
+      imageToImage: z.boolean(),
+    })
+    .optional(),
+  defaultParams: z.record(z.unknown()).optional(),
+  enabled: z.boolean().optional(),
+  isDefault: z.boolean().optional(),
+});
+export type UpdateImageStudioModelInput = z.infer<
+  typeof UpdateImageStudioModelSchema
+>;
+
 export const UpdateAppRegistrySchema = z.object({
   enabled: z.boolean().optional(),
   defaultModelConfigId: z.string().nullable().optional(),
