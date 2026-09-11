@@ -1,16 +1,20 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { ImageStudioModel, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import type { ImageStudioModel } from '@prisma/client';
 import type {
   CreateImageStudioModelInput,
   UpdateImageStudioModelInput,
 } from '@work-ally/shared';
 import { decryptSecret, encryptSecret } from '../../../common/crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
+
+type Db = Prisma.TransactionClient | PrismaService;
 
 @Injectable()
 export class ImageStudioModelsService {
@@ -31,25 +35,26 @@ export class ImageStudioModelsService {
     const encKey = this.encryptionKey();
     const baseUrl = input.baseUrl.trim().replace(/\/$/, '');
     const isDefault = input.isDefault ?? false;
+    const data = {
+      tenantId,
+      name: input.name.trim(),
+      provider: input.provider,
+      baseUrl,
+      apiKeyEnc: encryptSecret(input.apiKey.trim(), encKey),
+      modelName: input.modelName.trim(),
+      capabilities: input.capabilities as Prisma.InputJsonValue,
+      defaultParams: (input.defaultParams ?? {}) as Prisma.InputJsonValue,
+      enabled: input.enabled ?? true,
+      isDefault,
+    };
 
-    if (isDefault) {
-      await this.clearDefaults(tenantId);
-    }
+    const row = isDefault
+      ? await this.prisma.$transaction(async (tx) => {
+          await this.clearDefaults(tenantId, tx);
+          return tx.imageStudioModel.create({ data });
+        })
+      : await this.prisma.imageStudioModel.create({ data });
 
-    const row = await this.prisma.imageStudioModel.create({
-      data: {
-        tenantId,
-        name: input.name.trim(),
-        provider: input.provider,
-        baseUrl,
-        apiKeyEnc: encryptSecret(input.apiKey.trim(), encKey),
-        modelName: input.modelName.trim(),
-        capabilities: input.capabilities as Prisma.InputJsonValue,
-        defaultParams: (input.defaultParams ?? {}) as Prisma.InputJsonValue,
-        enabled: input.enabled ?? true,
-        isDefault,
-      },
-    });
     return this.serializeAdmin(row);
   }
 
@@ -78,31 +83,65 @@ export class ImageStudioModelsService {
       data.apiKeyEnc = encryptSecret(input.apiKey.trim(), this.encryptionKey());
     }
     if (input.isDefault === true) {
-      await this.clearDefaults(tenantId);
       data.isDefault = true;
     } else if (input.isDefault === false) {
       data.isDefault = false;
     }
 
-    const row = await this.prisma.imageStudioModel.update({
-      where: { id: existing.id },
-      data,
-    });
+    const row =
+      input.isDefault === true
+        ? await this.prisma.$transaction(async (tx) => {
+            await this.clearDefaults(tenantId, tx);
+            return tx.imageStudioModel.update({
+              where: { id: existing.id },
+              data,
+            });
+          })
+        : await this.prisma.imageStudioModel.update({
+            where: { id: existing.id },
+            data,
+          });
+
     return this.serializeAdmin(row);
   }
 
   async remove(tenantId: string, id: string) {
     await this.requireModel(tenantId, id);
-    await this.prisma.imageStudioModel.delete({ where: { id } });
+
+    const [turnCount, projectCount] = await Promise.all([
+      this.prisma.imageStudioTurn.count({ where: { modelId: id } }),
+      this.prisma.imageStudioProject.count({ where: { defaultModelId: id } }),
+    ]);
+    if (turnCount > 0 || projectCount > 0) {
+      throw new ConflictException(
+        '模型仍被项目或生成记录引用，无法删除',
+      );
+    }
+
+    try {
+      await this.prisma.imageStudioModel.delete({ where: { id } });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          '模型仍被项目或生成记录引用，无法删除',
+        );
+      }
+      throw err;
+    }
     return { ok: true };
   }
 
   async setDefault(tenantId: string, id: string) {
     const existing = await this.requireModel(tenantId, id);
-    await this.clearDefaults(tenantId);
-    const row = await this.prisma.imageStudioModel.update({
-      where: { id: existing.id },
-      data: { isDefault: true },
+    const row = await this.prisma.$transaction(async (tx) => {
+      await this.clearDefaults(tenantId, tx);
+      return tx.imageStudioModel.update({
+        where: { id: existing.id },
+        data: { isDefault: true },
+      });
     });
     return this.serializeAdmin(row);
   }
@@ -193,8 +232,8 @@ export class ImageStudioModelsService {
     return row;
   }
 
-  private async clearDefaults(tenantId: string) {
-    await this.prisma.imageStudioModel.updateMany({
+  private async clearDefaults(tenantId: string, db: Db = this.prisma) {
+    await db.imageStudioModel.updateMany({
       where: { tenantId, isDefault: true },
       data: { isDefault: false },
     });
