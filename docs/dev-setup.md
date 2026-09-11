@@ -56,6 +56,10 @@ pnpm smoke:runtime
 3. 工作台输入消息发送 → 进入 `/workbench/sessions/:id` 看流式输出与右侧事件
 4. 可继续追问（会触发新的 AgentRun + SSE）
 
+## 图工作室
+
+Admin 在「应用 · 图工作室」配置并启用图像模型后，用户从工作台打开图工作室即可（项目库 / 文生图 / 图生图）。冒烟：`pnpm smoke:image-studio`（未配置模型或未设 `IMAGE_STUDIO_SMOKE_GENERATE=1` 时跳过 generate）。
+
 ## Workspace layout
 
 See [requirements baseline](./requirements-baseline.md) §11.
