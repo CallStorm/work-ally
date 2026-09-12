@@ -48,18 +48,27 @@ async function listen(app: Awaited<ReturnType<typeof NestFactory.create>>, port:
           // eslint-disable-next-line no-console
           console.error(
             `\n[api] Port ${port} is already in use (EADDRINUSE).\n` +
-              `      Run: node scripts/kill-api-port.mjs\n` +
-              `      Or stop the other API process, then restart pnpm dev.\n`,
+              `      Another API is likely still running — keep a single \`pnpm dev\`.\n` +
+              `      To force free the port: node scripts/kill-api-port.mjs\n`,
           );
         }
         throw error;
       }
-      // eslint-disable-next-line no-console
-      console.warn(
-        `[api] Port ${port} busy — freeing listeners then retry (${attempt}/${maxAttempts})…`,
-      );
-      freePort(port);
-      await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+      // Wait first so a sibling nest --watch can finish; only steal the port late.
+      // Early freePort() caused healthy instances to kill each other under multi-dev.
+      if (attempt >= 3) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[api] Port ${port} still busy — freeing listeners then retry (${attempt}/${maxAttempts})…`,
+        );
+        freePort(port);
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[api] Port ${port} busy — waiting for other process (${attempt}/${maxAttempts})…`,
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 800 * attempt));
     }
   }
 }

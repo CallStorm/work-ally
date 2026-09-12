@@ -71,25 +71,26 @@ async function fetchWithRetry(
   init: RequestInit,
 ): Promise<Response> {
   const method = init.method ?? 'GET';
-  const maxAttempts = isIdempotentRequest(method) ? 3 : 1;
+  // Idempotent: wait through Nest --watch relaunch. Mutations: one extra 503 retry
+  // (proxy already waits longer on ECONNREFUSED).
+  const maxAttempts = isIdempotentRequest(method) ? 6 : 2;
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const res = await fetch(url, init);
       if (
-        isIdempotentRequest(method) &&
         (res.status === 502 || res.status === 503) &&
         attempt < maxAttempts - 1
       ) {
-        await sleep(350 * (attempt + 1));
+        await sleep(Math.min(400 * (attempt + 1), 1500));
         continue;
       }
       return res;
     } catch (error) {
       lastError = error;
       if (attempt < maxAttempts - 1) {
-        await sleep(350 * (attempt + 1));
+        await sleep(Math.min(400 * (attempt + 1), 1500));
         continue;
       }
     }

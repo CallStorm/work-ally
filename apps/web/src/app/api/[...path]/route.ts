@@ -3,7 +3,14 @@ import { NextRequest, NextResponse } from 'next/server';
 const API_TARGET =
   process.env.API_PROXY_TARGET?.replace(/\/$/, '') || 'http://127.0.0.1:3001';
 
-const RETRYABLE_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT']);
+const RETRYABLE_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EPIPE',
+  'ETIMEDOUT',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_SOCKET',
+]);
 const HOP_BY_HOP_HEADERS = new Set([
   'connection',
   'keep-alive',
@@ -20,10 +27,34 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Nest --watch restarts often surface as TypeError("fetch failed") + cause.code. */
 function isRetryableError(error: unknown) {
-  if (!error || typeof error !== 'object') return false;
-  const code = 'code' in error ? String(error.code) : '';
-  return RETRYABLE_CODES.has(code);
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth++) {
+    if (typeof current === 'object') {
+      const code =
+        'code' in current && current.code != null ? String(current.code) : '';
+      if (RETRYABLE_CODES.has(code)) return true;
+      const message =
+        current instanceof Error
+          ? current.message
+          : 'message' in current
+            ? String((current as { message: unknown }).message)
+            : '';
+      if (/ECONNREFUSED|ECONNRESET|EPIPE|ETIMEDOUT|fetch failed/i.test(message)) {
+        return true;
+      }
+      current = 'cause' in current ? (current as { cause: unknown }).cause : null;
+      continue;
+    }
+    break;
+  }
+  return false;
+}
+
+function retryDelayMs(attempt: number) {
+  // ~0.4s, 0.8s, 1.2s … capped — covers typical nest --watch relaunch gaps
+  return Math.min(400 * (attempt + 1), 1500);
 }
 
 function buildTargetUrl(path: string[], search: string) {
@@ -61,7 +92,8 @@ async function proxyRequest(request: NextRequest, path: string[]) {
     path.length >= 3 &&
     path[0] === 'runs' &&
     path[path.length - 1] === 'events';
-  const maxAttempts = isSse ? 1 : 3;
+  // SSE also retries connection setup (stream itself is one-shot after open).
+  const maxAttempts = isSse ? 8 : 10;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
@@ -81,7 +113,7 @@ async function proxyRequest(request: NextRequest, path: string[]) {
     } catch (error) {
       const retryable = isRetryableError(error);
       if (retryable && attempt < maxAttempts - 1) {
-        await sleep(350 * (attempt + 1));
+        await sleep(retryDelayMs(attempt));
         continue;
       }
 

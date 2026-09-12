@@ -1,6 +1,6 @@
 'use client';
 
-import type { ImageStudioPublicModel } from './types';
+import type { ImageStudioAspectRatio, ImageStudioPublicModel } from './types';
 
 type Props = {
   models: ImageStudioPublicModel[];
@@ -8,8 +8,19 @@ type Props = {
   onModelChange: (id: string) => void;
   n: number;
   onNChange: (n: number) => void;
+  aspectRatio: ImageStudioAspectRatio;
+  onAspectRatioChange: (ratio: ImageStudioAspectRatio) => void;
   disabled?: boolean;
 };
+
+const ASPECT_OPTIONS: Array<{ value: ImageStudioAspectRatio; label: string }> =
+  [
+    { value: '1:1', label: '1:1 方图' },
+    { value: '3:4', label: '3:4 竖版海报' },
+    { value: '9:16', label: '9:16 长竖版' },
+    { value: '4:3', label: '4:3 横版' },
+    { value: '16:9', label: '16:9 宽屏' },
+  ];
 
 export function ModelPicker({
   models,
@@ -17,6 +28,8 @@ export function ModelPicker({
   onModelChange,
   n,
   onNChange,
+  aspectRatio,
+  onAspectRatioChange,
   disabled,
 }: Props) {
   return (
@@ -39,6 +52,23 @@ export function ModelPicker({
               </option>
             ))
           )}
+        </select>
+      </label>
+      <label className="image-studio-model-picker__field">
+        <span>画幅</span>
+        <select
+          value={aspectRatio}
+          disabled={disabled}
+          onChange={(e) =>
+            onAspectRatioChange(e.target.value as ImageStudioAspectRatio)
+          }
+          aria-label="画幅比例"
+        >
+          {ASPECT_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
         </select>
       </label>
       <label className="image-studio-model-picker__field">

@@ -23,7 +23,7 @@ type Capabilities = {
 type ImageModel = {
   id: string;
   name: string;
-  provider: 'openai_compatible' | 'gemini';
+  provider: 'openai_compatible' | 'gemini' | 'minimax';
   baseUrl: string;
   modelName: string;
   capabilities: Capabilities;
@@ -34,7 +34,7 @@ type ImageModel = {
 
 type ModelForm = {
   name: string;
-  provider: 'openai_compatible' | 'gemini';
+  provider: 'openai_compatible' | 'gemini' | 'minimax';
   baseUrl: string;
   apiKey: string;
   modelName: string;
@@ -42,6 +42,24 @@ type ModelForm = {
   imageToImage: boolean;
   enabled: boolean;
   isDefault: boolean;
+};
+
+const PROVIDER_PRESETS: Record<
+  ModelForm['provider'],
+  { baseUrl: string; modelName: string }
+> = {
+  openai_compatible: {
+    baseUrl: 'https://api.openai.com/v1',
+    modelName: 'dall-e-3',
+  },
+  gemini: {
+    baseUrl: 'https://generativelanguage.googleapis.com',
+    modelName: 'imagen-3.0-generate-002',
+  },
+  minimax: {
+    baseUrl: 'https://api.minimaxi.com/v1',
+    modelName: 'image-01',
+  },
 };
 
 const emptyForm = (): ModelForm => ({
@@ -232,11 +250,16 @@ export default function AdminImageStudioPage() {
         setMessage('模型已更新');
       }
       cancelForm();
-      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : '保存模型失败');
     } finally {
       setBusyId(null);
+    }
+    // Refresh after clearing busy so "保存中" never sticks on list reload
+    try {
+      await refresh();
+    } catch {
+      /* loadError handled in refresh */
     }
   }
 
@@ -251,11 +274,15 @@ export default function AdminImageStudioPage() {
       });
       if (editingId === id) cancelForm();
       setMessage('模型已删除');
-      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败');
     } finally {
       setBusyId(null);
+    }
+    try {
+      await refresh();
+    } catch {
+      /* ignore */
     }
   }
 
@@ -268,11 +295,15 @@ export default function AdminImageStudioPage() {
         method: 'POST',
       });
       setMessage('已设为默认模型');
-      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : '设默认失败');
     } finally {
       setBusyId(null);
+    }
+    try {
+      await refresh();
+    } catch {
+      /* ignore */
     }
   }
 
@@ -301,11 +332,15 @@ export default function AdminImageStudioPage() {
         method: 'PATCH',
         body: JSON.stringify({ enabled: !m.enabled }),
       });
-      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : '更新启用状态失败');
     } finally {
       setBusyId(null);
+    }
+    try {
+      await refresh();
+    } catch {
+      /* ignore */
     }
   }
 
@@ -600,15 +635,20 @@ export default function AdminImageStudioPage() {
               Provider
               <select
                 value={form.provider}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const provider = e.target.value as ModelForm['provider'];
+                  const preset = PROVIDER_PRESETS[provider];
                   setForm({
                     ...form,
-                    provider: e.target.value as ModelForm['provider'],
-                  })
-                }
+                    provider,
+                    baseUrl: preset.baseUrl,
+                    modelName: preset.modelName,
+                  });
+                }}
                 style={fieldStyle}
               >
                 <option value="openai_compatible">OpenAI Compatible</option>
+                <option value="minimax">MiniMax</option>
                 <option value="gemini">Gemini（暂未实现生成）</option>
               </select>
             </label>
@@ -620,7 +660,11 @@ export default function AdminImageStudioPage() {
                 value={form.baseUrl}
                 onChange={(e) => setForm({ ...form, baseUrl: e.target.value })}
                 style={fieldStyle}
-                placeholder="https://api.example.com/v1"
+                placeholder={
+                  form.provider === 'minimax'
+                    ? 'https://api.minimaxi.com/v1'
+                    : 'https://api.example.com/v1'
+                }
               />
             </label>
             <label style={labelStyle}>
@@ -644,7 +688,9 @@ export default function AdminImageStudioPage() {
                   setForm({ ...form, modelName: e.target.value })
                 }
                 style={fieldStyle}
-                placeholder="dall-e-3"
+                placeholder={
+                  form.provider === 'minimax' ? 'image-01' : 'dall-e-3'
+                }
               />
             </label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
@@ -711,7 +757,10 @@ export default function AdminImageStudioPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               <button
                 type="submit"
-                disabled={busyId === 'create' || busyId === editingId}
+                disabled={
+                  busyId === 'create' ||
+                  (editingId != null && busyId === editingId)
+                }
                 style={{
                   padding: '9px 16px',
                   borderRadius: 10,
@@ -722,7 +771,8 @@ export default function AdminImageStudioPage() {
                   cursor: 'pointer',
                 }}
               >
-                {busyId === 'create' || busyId === editingId
+                {busyId === 'create' ||
+                (editingId != null && busyId === editingId)
                   ? '保存中…'
                   : '保存'}
               </button>

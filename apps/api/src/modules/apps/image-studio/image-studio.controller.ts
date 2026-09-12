@@ -16,6 +16,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import {
   CreateImageStudioProjectSchema,
+  EnhanceImageStudioPromptSchema,
   GenerateImageStudioSchema,
   UpdateImageStudioProjectSchema,
 } from '@work-ally/shared';
@@ -26,6 +27,7 @@ import { ImageStudioAppGuard } from '../image-studio-app.guard';
 import { ImageStudioAssetsService } from './image-studio-assets.service';
 import { ImageStudioGenerateService } from './image-studio-generate.service';
 import { ImageStudioProjectsService } from './image-studio-projects.service';
+import { ImageStudioPromptService } from './image-studio-prompt.service';
 
 const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 const UPLOAD_MIME = new Set(['image/png', 'image/jpeg', 'image/webp']);
@@ -37,7 +39,16 @@ export class ImageStudioController {
     private readonly projects: ImageStudioProjectsService,
     private readonly assets: ImageStudioAssetsService,
     private readonly generateService: ImageStudioGenerateService,
+    private readonly promptService: ImageStudioPromptService,
   ) {}
+
+  @Post('prompt/enhance')
+  enhancePrompt(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    return this.promptService.enhance(
+      user,
+      parseBody(EnhanceImageStudioPromptSchema, body),
+    );
+  }
 
   @Get('projects')
   listProjects(@CurrentUser() user: AuthUser) {

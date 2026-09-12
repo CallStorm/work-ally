@@ -5,7 +5,9 @@ import { ApiError, apiFetch } from '@/lib/api';
 import { AssetImg } from './asset-img';
 import { ModelPicker } from './model-picker';
 import type {
+  ImageStudioAspectRatio,
   ImageStudioAsset,
+  ImageStudioOverlayPosition,
   ImageStudioProject,
   ImageStudioPublicModel,
   ImageStudioTurn,
@@ -51,11 +53,17 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
   const [turns, setTurns] = useState<ImageStudioTurn[]>([]);
   const [modelId, setModelId] = useState('');
   const [n, setN] = useState(1);
+  const [aspectRatio, setAspectRatio] = useState<ImageStudioAspectRatio>('3:4');
   const [prompt, setPrompt] = useState('');
-  const [useCurrentAsSource, setUseCurrentAsSource] = useState(true);
+  const [overlayTitle, setOverlayTitle] = useState('');
+  const [overlaySubtitle, setOverlaySubtitle] = useState('');
+  const [overlayPosition, setOverlayPosition] =
+    useState<ImageStudioOverlayPosition>('center');
+  const [useCurrentAsSource, setUseCurrentAsSource] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
   const [activeTurnStatus, setActiveTurnStatus] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -126,9 +134,46 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
     turnsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [turns.length, generating]);
 
+  async function handleEnhancePrompt() {
+    const draft = prompt.trim();
+    if (!draft || enhancing || generating) return;
+    setEnhancing(true);
+    setError(null);
+    try {
+      const title = overlayTitle.trim();
+      const result = await apiFetch<{ prompt: string }>(
+        '/apps/image-studio/prompt/enhance',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            draft,
+            ...(title
+              ? {
+                  overlayTitle: title,
+                  ...(overlaySubtitle.trim()
+                    ? { overlaySubtitle: overlaySubtitle.trim() }
+                    : {}),
+                }
+              : {}),
+          }),
+        },
+      );
+      if (result.prompt?.trim()) {
+        setPrompt(result.prompt.trim());
+      }
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : '优化失败，请稍后重试',
+      );
+    } finally {
+      setEnhancing(false);
+    }
+  }
+
   async function handleGenerate() {
     const text = prompt.trim();
-    if (!text || generating || !modelId) return;
+    const title = overlayTitle.trim();
+    if ((!text && !title) || generating || !modelId) return;
     setGenerating(true);
     setActiveTurnStatus('running');
     setError(null);
@@ -137,15 +182,30 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
         useCurrentAsSource && project?.currentAssetId
           ? project.currentAssetId
           : null;
+      const scenePrompt =
+        text ||
+        (title
+          ? `${title}节日宣传海报背景，喜庆氛围，完整构图`
+          : '');
       const started = await apiFetch<ImageStudioTurn>(
         `/apps/image-studio/projects/${projectId}/generate`,
         {
           method: 'POST',
           body: JSON.stringify({
-            prompt: text,
+            prompt: scenePrompt,
             modelId,
             n,
             sourceAssetId,
+            aspectRatio,
+            ...(title
+              ? {
+                  overlayTitle: title,
+                  overlayPosition,
+                  ...(overlaySubtitle.trim()
+                    ? { overlaySubtitle: overlaySubtitle.trim() }
+                    : {}),
+                }
+              : {}),
           }),
         },
       );
@@ -267,6 +327,8 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
           onModelChange={setModelId}
           n={n}
           onNChange={setN}
+          aspectRatio={aspectRatio}
+          onAspectRatioChange={setAspectRatio}
           disabled={generating}
         />
       </header>
@@ -303,7 +365,9 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
                     <span className="image-studio-turn__badge">文生图</span>
                   )}
                 </div>
-                <p className="image-studio-turn__prompt">{turn.prompt}</p>
+                <p className="image-studio-turn__prompt" title={turn.prompt}>
+                  {turn.prompt}
+                </p>
                 {turn.status === 'failed' && turn.errorMessage && (
                   <p className="image-studio-turn__error">{turn.errorMessage}</p>
                 )}
@@ -350,19 +414,67 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
                 <span>使用当前图作为参考（图生图）</span>
               </label>
             )}
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="描述你想生成的画面…"
-              rows={3}
-              disabled={generating}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  void handleGenerate();
-                }
-              }}
+            <input
+              className="image-studio-workspace__title-input"
+              value={overlayTitle}
+              onChange={(e) => setOverlayTitle(e.target.value)}
+              placeholder="标题文字（推荐填写，将清晰叠到图上）"
+              maxLength={40}
+              disabled={generating || enhancing}
             />
+            {overlayTitle.trim() ? (
+              <>
+                <input
+                  className="image-studio-workspace__title-input image-studio-workspace__title-input--sub"
+                  value={overlaySubtitle}
+                  onChange={(e) => setOverlaySubtitle(e.target.value)}
+                  placeholder="副标题（可选）"
+                  maxLength={80}
+                  disabled={generating || enhancing}
+                />
+                <label className="image-studio-workspace__position">
+                  <span>文字位置</span>
+                  <select
+                    value={overlayPosition}
+                    disabled={generating || enhancing}
+                    onChange={(e) =>
+                      setOverlayPosition(
+                        e.target.value as ImageStudioOverlayPosition,
+                      )
+                    }
+                    aria-label="叠字位置"
+                  >
+                    <option value="top">上方</option>
+                    <option value="center">居中</option>
+                    <option value="bottom">下方</option>
+                  </select>
+                </label>
+              </>
+            ) : null}
+            <div className="image-studio-workspace__prompt-wrap">
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="画面描述：风格、场景、色彩…（可先写短句，再点优化）"
+                rows={3}
+                disabled={generating || enhancing}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    void handleGenerate();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="image-studio-workspace__enhance"
+                disabled={enhancing || generating || !prompt.trim()}
+                onClick={() => void handleEnhancePrompt()}
+                title="用 AI 把短句扩写成更适合出图的画面描述"
+              >
+                {enhancing ? '优化中…' : '优化'}
+              </button>
+            </div>
             <div className="image-studio-workspace__composer-actions">
               <input
                 ref={fileInputRef}
@@ -377,7 +489,7 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
               <button
                 type="button"
                 className="image-studio-btn"
-                disabled={generating || uploading}
+                disabled={generating || uploading || enhancing}
                 onClick={() => fileInputRef.current?.click()}
               >
                 {uploading ? '上传中…' : '上传参考图'}
@@ -386,13 +498,20 @@ export function Workspace({ projectId, onBack, onProjectUpdated }: Props) {
                 type="button"
                 className="image-studio-btn image-studio-btn--primary"
                 disabled={
-                  generating || !prompt.trim() || !modelId || models.length === 0
+                  generating ||
+                  enhancing ||
+                  (!prompt.trim() && !overlayTitle.trim()) ||
+                  !modelId ||
+                  models.length === 0
                 }
                 onClick={() => void handleGenerate()}
               >
                 {generating ? '生成中…' : '生成'}
               </button>
             </div>
+            <p className="image-studio-workspace__hint">
+              画幅用右上角选择；画面默认不出字，标题由系统按位置叠上。可先写短句点「优化」再生成。
+            </p>
           </div>
         </aside>
 

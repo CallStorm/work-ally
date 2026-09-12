@@ -13,6 +13,7 @@ import type {
 } from '@work-ally/shared';
 import { decryptSecret, encryptSecret } from '../../../common/crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { minimaxConnectionTest } from './providers/minimax-images';
 
 type Db = Prisma.TransactionClient | PrismaService;
 
@@ -151,7 +152,7 @@ export class ImageStudioModelsService {
     id: string,
   ): Promise<{ ok: boolean; message: string }> {
     const row = await this.requireModel(tenantId, id);
-    if (row.provider !== 'openai_compatible') {
+    if (row.provider !== 'openai_compatible' && row.provider !== 'minimax') {
       throw new BadRequestException('该 provider 暂未实现');
     }
 
@@ -161,6 +162,19 @@ export class ImageStudioModelsService {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       throw new BadRequestException(`解密 API Key 失败: ${message}`);
+    }
+
+    if (row.provider === 'minimax') {
+      try {
+        return await minimaxConnectionTest({
+          baseUrl: row.baseUrl,
+          apiKey,
+          modelName: row.modelName,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        throw new BadRequestException(`连接测试失败: ${message}`);
+      }
     }
 
     const root = row.baseUrl.replace(/\/$/, '');

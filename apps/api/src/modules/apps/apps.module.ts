@@ -14,6 +14,7 @@ import { ImageStudioController } from './image-studio/image-studio.controller';
 import { ImageStudioGenerateService } from './image-studio/image-studio-generate.service';
 import { ImageStudioModelsService } from './image-studio/image-studio-models.service';
 import { ImageStudioProjectsService } from './image-studio/image-studio-projects.service';
+import { ImageStudioPromptService } from './image-studio/image-studio-prompt.service';
 import { NotesController } from './notes/notes.controller';
 import { HandbookCategoriesService } from './notes/handbook-categories.service';
 import { HandbookNotesService } from './notes/handbook-notes.service';
@@ -43,6 +44,7 @@ import { TaskReminderScheduler } from './tasks/task-reminder.scheduler';
     ImageStudioProjectsService,
     ImageStudioAssetsService,
     ImageStudioGenerateService,
+    ImageStudioPromptService,
     HandbookCategoriesService,
     HandbookNotesService,
     NotesAiService,

@@ -15,6 +15,11 @@ import {
   OpenAiCompatibleImagesError,
   formatProviderError,
 } from './providers/openai-compatible-images';
+import { minimaxImages } from './providers/minimax-images';
+import {
+  buildNoTextPosterPrompt,
+  overlayTitleOnImage,
+} from './providers/text-overlay';
 
 @Injectable()
 export class ImageStudioGenerateService {
@@ -36,7 +41,10 @@ export class ImageStudioGenerateService {
       input.modelId ?? project.defaultModelId,
     );
 
-    if (model.provider !== 'openai_compatible') {
+    if (
+      model.provider !== 'openai_compatible' &&
+      model.provider !== 'minimax'
+    ) {
       throw new BadRequestException('该 provider 暂未实现');
     }
 
@@ -79,7 +87,7 @@ export class ImageStudioGenerateService {
       data: {
         projectId: project.id,
         parentTurnId: input.parentTurnId ?? null,
-        prompt: input.prompt,
+        prompt: buildStoredPrompt(input),
         modelId: model.id,
         sourceAssetId,
         status: 'running',
@@ -88,16 +96,66 @@ export class ImageStudioGenerateService {
 
     const createdAssets: ImageStudioAsset[] = [];
     try {
-      const images = await openaiCompatibleImages({
-        baseUrl: model.baseUrl,
-        apiKey: model.apiKey,
-        modelName: model.modelName,
-        prompt: input.prompt,
-        n: input.n,
-        sourceImage,
-        sourceMime,
-        defaultParams: model.defaultParams,
+      const overlayTitle = input.overlayTitle?.trim() || '';
+      const overlaySubtitle = input.overlaySubtitle?.trim() || '';
+      const overlayPosition = input.overlayPosition ?? 'center';
+      const modelPrompt = buildNoTextPosterPrompt(input.prompt, {
+        forOverlay: Boolean(overlayTitle),
+        position: overlayPosition,
       });
+
+      const baseParams =
+        model.defaultParams &&
+        typeof model.defaultParams === 'object' &&
+        !Array.isArray(model.defaultParams)
+          ? { ...(model.defaultParams as Record<string, unknown>) }
+          : {};
+      if (input.aspectRatio) {
+        baseParams.aspect_ratio = input.aspectRatio;
+        // OpenAI-compatible gateways often want `size` instead
+        const size = aspectRatioToOpenAiSize(input.aspectRatio);
+        if (size) baseParams.size = size;
+      }
+
+      let images =
+        model.provider === 'minimax'
+          ? await minimaxImages({
+              baseUrl: model.baseUrl,
+              apiKey: model.apiKey,
+              modelName: model.modelName,
+              prompt: modelPrompt,
+              n: input.n,
+              sourceImage,
+              sourceMime,
+              defaultParams: baseParams,
+            })
+          : await openaiCompatibleImages({
+              baseUrl: model.baseUrl,
+              apiKey: model.apiKey,
+              modelName: model.modelName,
+              prompt: modelPrompt,
+              n: input.n,
+              sourceImage,
+              sourceMime,
+              defaultParams: baseParams,
+            });
+
+      if (overlayTitle) {
+        images = await Promise.all(
+          images.map(async (image) => {
+            const composed = await overlayTitleOnImage({
+              image: image.buffer,
+              title: overlayTitle,
+              subtitle: overlaySubtitle || undefined,
+              position: overlayPosition,
+            });
+            return {
+              buffer: composed.buffer,
+              mimeType: composed.mimeType,
+            };
+          }),
+        );
+      }
 
       for (const image of images) {
         const pending = await this.prisma.imageStudioAsset.create({
@@ -270,6 +328,34 @@ function extensionForMime(mime: string): string {
       return 'webp';
     default:
       return 'bin';
+  }
+}
+
+function buildStoredPrompt(input: GenerateImageStudioInput): string {
+  const title = input.overlayTitle?.trim() || '';
+  const subtitle = input.overlaySubtitle?.trim() || '';
+  const scene = input.prompt.trim();
+  if (!title) return scene;
+  const head = subtitle ? `[叠字] ${title} · ${subtitle}` : `[叠字] ${title}`;
+  return scene ? `${head}\n${scene}` : head;
+}
+
+function aspectRatioToOpenAiSize(ratio: string): string | null {
+  switch (ratio) {
+    case '1:1':
+      return '1024x1024';
+    case '16:9':
+    case '21:9':
+      return '1792x1024';
+    case '9:16':
+    case '2:3':
+    case '3:4':
+      return '1024x1792';
+    case '4:3':
+    case '3:2':
+      return '1792x1024';
+    default:
+      return null;
   }
 }
 

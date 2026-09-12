@@ -11,6 +11,18 @@ export type ImageStudioProject = {
   updatedAt: string;
 };
 
+export type ImageStudioAspectRatio =
+  | '1:1'
+  | '16:9'
+  | '4:3'
+  | '3:2'
+  | '2:3'
+  | '3:4'
+  | '9:16'
+  | '21:9';
+
+export type ImageStudioOverlayPosition = 'top' | 'center' | 'bottom';
+
 export type ImageStudioPublicModel = {
   id: string;
   name: string;

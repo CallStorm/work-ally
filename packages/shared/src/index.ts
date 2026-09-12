@@ -213,6 +213,7 @@ export const IMAGE_STUDIO_SLUG = 'image-studio';
 export const ImageStudioProviderSchema = z.enum([
   'openai_compatible',
   'gemini',
+  'minimax',
 ]);
 export type ImageStudioProvider = z.infer<typeof ImageStudioProviderSchema>;
 
@@ -237,14 +238,50 @@ export type UpdateImageStudioProjectInput = z.infer<
   typeof UpdateImageStudioProjectSchema
 >;
 
+export const ImageStudioAspectRatioSchema = z.enum([
+  '1:1',
+  '16:9',
+  '4:3',
+  '3:2',
+  '2:3',
+  '3:4',
+  '9:16',
+  '21:9',
+]);
+export type ImageStudioAspectRatio = z.infer<typeof ImageStudioAspectRatioSchema>;
+
+export const ImageStudioOverlayPositionSchema = z.enum([
+  'top',
+  'center',
+  'bottom',
+]);
+export type ImageStudioOverlayPosition = z.infer<
+  typeof ImageStudioOverlayPositionSchema
+>;
+
 export const GenerateImageStudioSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
   modelId: z.string().cuid().optional(),
   sourceAssetId: z.string().cuid().nullable().optional(),
   n: z.number().int().min(1).max(4).optional().default(1),
   parentTurnId: z.string().cuid().nullable().optional(),
+  aspectRatio: ImageStudioAspectRatioSchema.optional(),
+  /** When set, model generates a no-text background and server composites this title. */
+  overlayTitle: z.string().trim().max(40).optional(),
+  overlaySubtitle: z.string().trim().max(80).optional(),
+  overlayPosition: ImageStudioOverlayPositionSchema.optional().default('center'),
 });
 export type GenerateImageStudioInput = z.infer<typeof GenerateImageStudioSchema>;
+
+/** Expand a short scene draft into a stronger image-gen prompt (no title glyphs). */
+export const EnhanceImageStudioPromptSchema = z.object({
+  draft: z.string().trim().min(1).max(2000),
+  overlayTitle: z.string().trim().max(40).optional(),
+  overlaySubtitle: z.string().trim().max(80).optional(),
+});
+export type EnhanceImageStudioPromptInput = z.infer<
+  typeof EnhanceImageStudioPromptSchema
+>;
 
 export const CreateImageStudioModelSchema = z.object({
   name: z.string().trim().min(1).max(128),

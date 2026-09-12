@@ -16,7 +16,7 @@ export async function subscribeRunEvents(
     token ? `?access_token=${encodeURIComponent(token)}` : ''
   }`;
 
-  const maxAttempts = 4;
+  const maxAttempts = 8;
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -31,7 +31,7 @@ export async function subscribeRunEvents(
       if (!res.ok || !res.body) {
         // 503 during API hot-reload — retry
         if ((res.status === 502 || res.status === 503) && attempt < maxAttempts - 1) {
-          await sleep(400 * (attempt + 1));
+          await sleep(Math.min(400 * (attempt + 1), 1500));
           continue;
         }
         throw new Error(`SSE failed: ${res.status}`);
@@ -67,7 +67,7 @@ export async function subscribeRunEvents(
       lastError = error;
       if ((error as Error).name === 'AbortError') throw error;
       if (attempt < maxAttempts - 1) {
-        await sleep(400 * (attempt + 1));
+        await sleep(Math.min(400 * (attempt + 1), 1500));
         continue;
       }
     }
